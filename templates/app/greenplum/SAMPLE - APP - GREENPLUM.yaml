@@ -1,0 +1,869 @@
+formatVersion: 1
+inputs:
+  _projectId_:
+    type: string
+    title: projectId
+  _computeType_:
+    type: string
+    title: computeType
+    readOnly: true
+    $dynamicDefault: /data/vro-actions/com.vmk.inputs/getComputeType?zoneId={{zoneId}}
+  _intNet_:
+    type: string
+    title: intNet
+    readOnly: true
+    default: network:demand
+  _jumpFlavor_:
+    type: string
+    title: jumpFlavor
+    readOnly: true
+    default: small
+  _image_:
+    type: string
+    title: image
+    readOnly: true
+    default: gpdb
+  zoneId:
+    type: string
+    title: Cloud
+    $dynamicEnum: /data/vro-actions/com.vmk.inputs.blueprint/getCloudZones?projectId={{_projectId_}}
+  computeTag:
+    type: string
+    title: Compute
+    $dynamicEnum: /data/vro-actions/com.vmk.inputs.blueprint/getComputeTags?zoneId={{zoneId}}
+  mdwFlavor:
+    type: string
+    title: Master Host Flavor
+    $dynamicEnum: /data/vro-actions/com.vmk.inputs.blueprint/getFlavors
+  mdwStandby:
+    type: boolean
+    title: Standby Master
+    default: true
+  mdwDisk:
+    type: number
+    title: Master Host Disk (GB)
+    default: 50
+    minimum: 10
+    maximum: 20248
+  sdwFlavor:
+    type: string
+    title: Segment Host Flavor
+    $dynamicEnum: /data/vro-actions/com.vmk.inputs.blueprint/getFlavors
+  sdwCount:
+    type: number
+    title: Segment Host Count
+    default: 3
+    minimum: 1
+  sdwSegCount:
+    type: number
+    title: Segment Per Host
+    default: 2
+    minimum: 1
+    maximum: 8
+  sdwDisk:
+    type: number
+    title: Segment Host Disk (GB)
+    default: 50
+    minimum: 10
+    maximum: 2048
+  extNet:
+    type: string
+    title: External Network
+    $dynamicEnum: /data/vro-actions/com.vmk.inputs.blueprint/getNetworkTags?zoneId={{zoneId}}
+  version:
+    type: string
+    title: Greenplum Version
+    default: 6.21.0
+    enum:
+      - 6.19.4
+      - 6.20.5
+      - 6.21.0
+  ntp:
+    type: string
+    title: NTP Server
+  username:
+    type: string
+    title: Username
+  password:
+    type: string
+    title: Password
+    encrypted: true
+resources:
+  jump:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      count: ${input._computeType_!="vmw"?1:0}
+      image: ${input._image_}
+      flavor: ${input._jumpFlavor_}
+      constraints:
+        - tag: ${input.computeTag}
+      networks:
+        - network: ${resource.extNet.id}
+          assignPublicIpAddress: true
+      cloudConfig: |
+        #cloudConfig
+        users:
+          - name: ${input.username}
+            sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            lock_passwd: false
+          - name: gpadmin
+            sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            lock_passwd: false
+        chpasswd:
+          list:
+            - ${input.username}:${input.password}
+            - gpadmin:${input.password}
+          expire: False
+        ssh_pwauth: true
+        runcmd:
+          - echo "${resource.mdw.networks[0].address}  mdw" >> /etc/hosts
+          - echo "${input.mdwStandby==true?resource.smdw.networks[0].address + "  smdw":""}" >> /etc/hosts
+  extNet:
+    type: Cloud.Network
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${input.extNet}
+  intNet:
+    type: Cloud.Network
+    metadata:
+      layoutPosition:
+        - 2
+        - 0
+    properties:
+      networkType: ${input._computeType_=="vmw"?"private":"outbound"}
+      constraints:
+        - tag: ${input._intNet_}
+  mdw:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 3
+        - 0
+    properties:
+      image: ${input._image_}
+      flavor: ${input.mdwFlavor}
+      placementPolicy: ${input._computeType_=="vmw"?"true":"false"}
+      networks: ${[{"network":resource.intNet.id,"assignment":input._computeType_=="vmw"?"static":"dynamic","deviceIndex":input._computeType_=="vmw"?1:0}]+[input._computeType_=="vmw"?{"network":resource.extNet.id,"assignment":"static","deviceIndex":0}:null]}
+      constraints:
+        - tag: ${input.computeTag}
+      cloudConfig: |
+        #cloudConfig
+        users:
+          - name: ${input.username}
+            sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            ssh_authorized_keys:
+              - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDq7mtVrIowKXJ1V+kcAuRd+ZwTkqk7aDG31lJrI3BizU/tNODAoql2ga8oqLpAvuQzyWoDCfxengoU17zwICb11IbYTBvdFJrdeFwlVXslqJUXOtbRy/WfLPbfEvxiDC+WIa/sT61vNPogzmD0QAZ5fOiUo5K5z1TgNd6iuhrIRRVylzdk+572934tNM4dTS6nYZkf1BIm1UmsWad2FDkHp40/YsYwfJ8hd5xmU5UfBxNew3aDo2EEN3RHw8SAh+f2Dm5HUa8HexuqrlqkaHDVgIawmRtwlAnuKuMEZHtzjAa+KBdd+8wYqiRLIeOY9XeQzjZakv3pAtTi7joyWtFj
+            lock_passwd: false
+          - name: gpadmin
+            sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            ssh_authorized_keys:
+              - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDq7mtVrIowKXJ1V+kcAuRd+ZwTkqk7aDG31lJrI3BizU/tNODAoql2ga8oqLpAvuQzyWoDCfxengoU17zwICb11IbYTBvdFJrdeFwlVXslqJUXOtbRy/WfLPbfEvxiDC+WIa/sT61vNPogzmD0QAZ5fOiUo5K5z1TgNd6iuhrIRRVylzdk+572934tNM4dTS6nYZkf1BIm1UmsWad2FDkHp40/YsYwfJ8hd5xmU5UfBxNew3aDo2EEN3RHw8SAh+f2Dm5HUa8HexuqrlqkaHDVgIawmRtwlAnuKuMEZHtzjAa+KBdd+8wYqiRLIeOY9XeQzjZakv3pAtTi7joyWtFj
+            lock_passwd: false
+        chpasswd:
+          list:
+            - ${input.username}:${input.password}
+            - gpadmin:${input.password}
+          expire: False
+        ssh_pwauth: true
+        package_update: false
+        package_upgrade: false
+        write_files:
+          - path: /root/.ssh/id_rsa
+            permissions: '0600'
+            owner: root:root
+            content: |
+              -----BEGIN OPENSSH PRIVATE KEY-----
+              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
+              -----END OPENSSH PRIVATE KEY-----
+          - path: /etc/sysctl.conf
+            permissions: '0644'
+            owner: root:root
+            content: |
+              vm.overcommit_memory = 2
+              vm.overcommit_ratio = 95
+              net.ipv4.ip_local_port_range = 10000 65535
+              kernel.sem = 250 2048000 200 8192
+              kernel.sysrq = 1
+              kernel.core_uses_pid = 1
+              kernel.msgmnb = 65536
+              kernel.msgmax = 65536
+              kernel.msgmni = 2048
+              net.ipv4.tcp_syncookies = 1
+              net.ipv4.conf.default.accept_source_route = 0
+              net.ipv4.tcp_max_syn_backlog = 4096
+              net.ipv4.conf.all.arp_filter = 1
+              net.core.netdev_max_backlog = 10000
+              net.core.rmem_max = 2097152
+              net.core.wmem_max = 2097152
+              vm.swappiness = 10
+              vm.zone_reclaim_mode = 0
+              vm.dirty_expire_centisecs = 500
+              vm.dirty_writeback_centisecs = 100
+          - path: /etc/security/limits.conf
+            permissions: '0644'
+            owner: root:root
+            content: |
+              * soft nofile 524288
+              * hard nofile 524288
+              * soft nproc 131072
+              * hard nproc 131072
+          - path: /etc/ntp.conf
+            permissions: '0644'
+            owner: root:root
+            content: |
+              driftfile /var/lib/ntp/drift
+              restrict default nomodify notrap nopeer noquery
+              restrict 127.0.0.1
+              restrict ::1
+              includefile /etc/ntp/crypto/pw
+              keys /etc/ntp/keys
+              disable monitor
+              server ${input.ntp} iburst
+          - path: /opt/gp.conf
+            permissions: '0644'
+            owner: root:root
+            content: |
+              ARRAY_NAME="Greenplum Data Platform"
+              SEG_PREFIX=gpseg
+              PORT_BASE=10000
+              MASTER_HOSTNAME=mdw
+              MASTER_DIRECTORY=/data/master
+              MASTER_PORT=5432
+              TRUSTED_SHELL=ssh
+              CHECK_POINT_SEGMENTS=8
+              ENCODING=UNICODE
+          - path: /opt/gp_prepare.sh
+            permissions: '0744'
+            owner: root:root
+            content: |
+              #!/bin/bash
+              sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+              rm -rf /etc/security/limits.d/*
+              chown gpadmin:gpadmin /home/gpadmin/gp.conf
+              # SYSCTL
+              echo "kernel.shmall = $(expr $(getconf _PHYS_PAGES) / 2)" >> /etc/sysctl.conf
+              echo "kernel.shmmax = $(expr $(getconf _PHYS_PAGES) / 2 \* $(getconf PAGE_SIZE))" >> /etc/sysctl.conf
+              if [ 65536 -gt 8192 ]; then
+                echo "vm.dirty_background_ratio = 0" >> /etc/sysctl.conf
+                echo "vm.dirty_ratio = 0" >> /etc/sysctl.conf
+              else
+                echo "vm.dirty_background_ratio = 3" >> /etc/sysctl.conf
+                echo "vm.dirty_ratio = 10" >> /etc/sysctl.conf
+                echo "vm.dirty_background_bytes = 1610612736" >> /etc/sysctl.conf
+                echo "vm.dirty_bytes = 4294967296" >> /etc/sysctl.conf
+              fi
+              # GRUB
+              grubby --update-kernel=ALL --args="transparent_hugepage=never"
+              # IPC
+              echo "RemoveIPC=no" >> /etc/systemd/logind.conf
+              # SSH
+              echo "MaxStartups 10:30:200" >> /etc/ssh/sshd_config
+              echo "MaxSessions 200" >> /etc/ssh/sshd_config
+              sed -i '/StrictHostKeyChecking/d' /etc/ssh/ssh_config
+              sed -i '/UserKnownHostsFile/d' /etc/ssh/ssh_config
+              echo "StrictHostKeyChecking no" >> /etc/ssh/ssh_config
+              echo "UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config
+              # HOSTNAMES
+              echo "mdw" > /etc/hostname
+              MYADDR=$(ip addr | grep "^${input._computeType_=="vmw"?3:2}:" -A 3 | grep "inet " | awk '{print $2}' | sed "s/\/.*//")
+              echo "$MYADDR mdw" >> /etc/hosts
+              touch /home/gpadmin/hosts_all
+              touch /home/gpadmin/hosts_sdw
+              touch /home/gpadmin/hosts_tgt
+              touch /home/gpadmin/hosts
+              chown gpadmin:gpadmin /home/gpadmin/hosts*
+              echo "mdw" >> /home/gpadmin/hosts_all
+              # GP Data Storage Area
+              DISK=${input._computeType_=="vmw"?"sdb":"xvdf"}
+              mkdir -p /data
+              mkfs.xfs /dev/$DISK
+              mount /dev/$DISK /data
+              echo "/dev/$DISK /data xfs defaults 0 0" >> /etc/fstab
+              mkdir -p /data/master
+              chown gpadmin:gpadmin /data/master
+              yum update -y
+              yum install -y epel-release
+              yum install -y apr apr-util bash bzip2 curl krb5-devel libcurl libevent libxml2 libyaml zlib openldap openssh openssl openssl-libs perl readline rsync R sed tar zip ntp wget
+              mkdir -p /gpdb
+              wget --no-check-certificate https://download.vmkloud.com/share/images/vmware/gpdb/greenplum-db-${input.version}-rhel7-x86_64.rpm -O /gpdb/greenplum-db.rpm
+              rpm --install /gpdb/greenplum-db.rpm --prefix=/gpdb
+              chown -R gpadmin:gpadmin /gpdb/greenplum*
+              chgrp -R gpadmin /gpdb/greenplum*
+              echo "source /gpdb/greenplum-db/greenplum_path.sh" >> /home/gpadmin/.bashrc
+              # GP INIT CONF
+              mv /opt/gp.conf /home/gpadmin/gp.conf
+              chown gpadmin:gpadmin /home/gpadmin/gp.conf
+              echo -n 'declare -a DATA_DIRECTORY=(' >> /home/gpadmin/gp.conf
+              for (( i=1; i<=${input.sdwSegCount}; i++ )); do
+                echo -n "/data/primary" >> /home/gpadmin/gp.conf
+                if [ $i != ${input.sdwSegCount} ]; then
+                  echo -n " " >> /home/gpadmin/gp.conf
+                fi
+              done
+              echo ")" >> /home/gpadmin/gp.conf
+              # ENABLE GP INIT
+              systemctl enable gp_init.service
+          - path: /lib/systemd/system/gp_init.service
+            permissions: '0644'
+            owner: root:root
+            content: |
+              [Unit]
+              Description=GPDB Init Service
+              After=sshd.service
+              [Service]
+              Type=oneshot
+              ExecStart=/opt/gp_init.sh
+              RemainAfterExit=yes
+              TimeoutSec=0
+              KillMode=process
+              TasksMax=infinity
+              StandardOutput=journal+console
+              [Install]
+              WantedBy=multi-user.target
+          - path: /opt/gp_init.sh
+            permissions: '0744'
+            owner: root:root
+            content: |
+              #!/bin/bash
+              if [ ! -f /etc/gp-deploy ]; then
+                echo PREPARED > /etc/gp-deploy
+                PREPARED_TARGET=${(input.mdwStandby==true?1:0) + input.sdwCount}
+                while true; do
+                  PREPARED=$(cat /home/gpadmin/hosts_tgt | grep -v "^\s*$" | wc -l)
+                  if [ "$PREPARED" == "$PREPARED_TARGET" ]; then
+                    break
+                  fi
+                  echo "Wait Host Prepared : $PREPARED / $PREPARED_TARGET"
+                  sleep 5
+                done
+                cat /home/gpadmin/hosts >> /etc/hosts
+                ssh-keygen -t rsa -b 2048 -f /home/gpadmin/.ssh/id_rsa -N ''
+                cat /home/gpadmin/.ssh/id_rsa.pub >> /home/gpadmin/.ssh/authorized_keys
+                chown -R gpadmin:gpadmin /home/gpadmin/.ssh
+                for host in $(cat /home/gpadmin/hosts_tgt | grep -v "^\s*$"); do
+                  scp /home/gpadmin/hosts* gpadmin@$host:/home/gpadmin/
+                  scp /home/gpadmin/.ssh/id_rsa* gpadmin@$host:/home/gpadmin/.ssh/
+                  ssh gpadmin@$host "cat /home/gpadmin/hosts | sudo tee -a /etc/hosts; cat /home/gpadmin/.ssh/id_rsa.pub >> /home/gpadmin/.ssh/authorized_keys"
+                done
+                su - gpadmin -c "gpinitsystem -a -c /home/gpadmin/gp.conf -h /home/gpadmin/hosts_sdw ${input.mdwStandby==true?"-s smdw":""} >> /tmp/gpinitsystem.log"
+                cat <<EOF>> /home/gpadmin/.bashrc
+              export MASTER_DATA_DIRECTORY=/data/master/gpseg-1
+              export PGPORT=5432
+              export PGUSER=gpadmin
+              export GPDATABASE=gpadmin
+              export LD_PRELOAD=/lib64/libz.so.1 ps
+              EOF
+                if ${input.mdwStandby==true?"true":"false"}; then
+                  su - gpadmin -c "scp /home/gpadmin/.bashrc smdw:/home/gpadmin/.bashrc"
+                fi
+                su - gpadmin -c "gpssh -f /home/gpadmin/hosts_tgt -e 'echo OK | sudo tee /etc/gp-deploy > /dev/null'"
+                su - gpadmin -c "gpssh -f /home/gpadmin/hosts_all -e 'sudo rm -rf /root/.ssh/id_rsa'"
+                echo OK > /etc/gp-deploy
+              fi
+          - path: /opt/gp_tgt.sh
+            permissions: '0744'
+            owner: root:root
+            content: |
+              #!/bin/bash
+              TYPE=$1
+              NAME=$2
+              ADDR=$3
+              echo "$NAME" >> /home/gpadmin/hosts_all
+              if [ "$TYPE" == "sdw" ]; then
+                echo "$NAME" >> /home/gpadmin/hosts_sdw
+              fi
+              echo "$ADDR $NAME" >> /home/gpadmin/hosts
+              echo "$NAME" >> /home/gpadmin/hosts_tgt
+        runcmd:
+          - /opt/gp_prepare.sh > /var/log/gp_prepare.log
+          - reboot
+      attachedDisks:
+        - source: ${resource.mdwDisk.id}
+  smdw:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 3
+        - 1
+    allocatePerInstance: true
+    properties:
+      image: ${input._image_}
+      flavor: ${input.mdwFlavor}
+      placementPolicy: ${input._computeType_=="vmw"?"true":"false"}
+      count: ${input.mdwStandby==true?1:0}
+      networks: ${[{"network":resource.intNet.id,"assignment":input._computeType_=="vmw"?"static":"dynamic","deviceIndex":input._computeType_=="vmw"?1:0}]+[input._computeType_=="vmw"?{"network":resource.extNet.id,"assignment":"static","deviceIndex":0}:null]}
+      constraints:
+        - tag: ${input.computeTag}
+      cloudConfig: |
+        #cloudConfig
+        users:
+          - name: ${input.username}
+            sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            ssh_authorized_keys:
+              - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDq7mtVrIowKXJ1V+kcAuRd+ZwTkqk7aDG31lJrI3BizU/tNODAoql2ga8oqLpAvuQzyWoDCfxengoU17zwICb11IbYTBvdFJrdeFwlVXslqJUXOtbRy/WfLPbfEvxiDC+WIa/sT61vNPogzmD0QAZ5fOiUo5K5z1TgNd6iuhrIRRVylzdk+572934tNM4dTS6nYZkf1BIm1UmsWad2FDkHp40/YsYwfJ8hd5xmU5UfBxNew3aDo2EEN3RHw8SAh+f2Dm5HUa8HexuqrlqkaHDVgIawmRtwlAnuKuMEZHtzjAa+KBdd+8wYqiRLIeOY9XeQzjZakv3pAtTi7joyWtFj
+            lock_passwd: false
+          - name: gpadmin
+            sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            ssh_authorized_keys:
+              - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDq7mtVrIowKXJ1V+kcAuRd+ZwTkqk7aDG31lJrI3BizU/tNODAoql2ga8oqLpAvuQzyWoDCfxengoU17zwICb11IbYTBvdFJrdeFwlVXslqJUXOtbRy/WfLPbfEvxiDC+WIa/sT61vNPogzmD0QAZ5fOiUo5K5z1TgNd6iuhrIRRVylzdk+572934tNM4dTS6nYZkf1BIm1UmsWad2FDkHp40/YsYwfJ8hd5xmU5UfBxNew3aDo2EEN3RHw8SAh+f2Dm5HUa8HexuqrlqkaHDVgIawmRtwlAnuKuMEZHtzjAa+KBdd+8wYqiRLIeOY9XeQzjZakv3pAtTi7joyWtFj
+            lock_passwd: false
+        chpasswd:
+          list:
+            - ${input.username}:${input.password}
+            - gpadmin:${input.password}
+          expire: False
+        ssh_pwauth: true
+        package_update: false
+        package_upgrade: false
+        write_files:
+          - path: /root/.ssh/id_rsa
+            permissions: '0600'
+            owner: root:root
+            content: |
+              -----BEGIN OPENSSH PRIVATE KEY-----
+              b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABFwAAAAdzc2gtcn
+              NhAAAAAwEAAQAAAQEA6u5rVayKMClydVfpHALkXfmcE5KpO2gxt9ZSayNwYs1P7TTgwKKp
+              doGvKKi6QL7kM8lqAwn8Xp4KFNe88CAm9dSG2Ewb3RSa3XhcJVV7JaiVFzrW0cv1nyz23x
+              L8YgwvliGv7E+tbzT6IM5g9EAGeXzolKOSuc9U4DXeoroayEUVcpc3ZPue9vd+LTTOHU0u
+              p2GZH9QSJtVJrFmndhQ5B6eNP2LGMHyfIXecZlOVHwcTXsN2g6NhBDd0R8PEgIfn9g5uR1
+              GvB3sbqq5apGhw1YCGsJkbcJQJ7irjBGR7c4wGvigXXfvMGKokSyHjmPV3kM42WpL96QLU
+              4u46MlrRYwAAA8h7mAAae5gAGgAAAAdzc2gtcnNhAAABAQDq7mtVrIowKXJ1V+kcAuRd+Z
+              wTkqk7aDG31lJrI3BizU/tNODAoql2ga8oqLpAvuQzyWoDCfxengoU17zwICb11IbYTBvd
+              FJrdeFwlVXslqJUXOtbRy/WfLPbfEvxiDC+WIa/sT61vNPogzmD0QAZ5fOiUo5K5z1TgNd
+              6iuhrIRRVylzdk+572934tNM4dTS6nYZkf1BIm1UmsWad2FDkHp40/YsYwfJ8hd5xmU5Uf
+              BxNew3aDo2EEN3RHw8SAh+f2Dm5HUa8HexuqrlqkaHDVgIawmRtwlAnuKuMEZHtzjAa+KB
+              dd+8wYqiRLIeOY9XeQzjZakv3pAtTi7joyWtFjAAAAAwEAAQAAAQEA3SmV4hGMBcr+9XjM
+              +pG+armRNNvcdRChvW8GJ9Y09s5Rb/1XmAGJhwaO3rf4nvsV2arDIhlEe85Lr1NpiqS6CL
+              MKPpVnpbjAEb49AOh4BfuuXzAFC3v2vuKVhWtaLPNL2Qndk5lurEIzNq8Slt2vOq9cRJG4
+              jzOfs3MDJC4PCHgy+j3LcJN691Yhg98dGdcrDcfYAqe4DUdHoILaiRW7tHQ7qH/fCdWdPC
+              KvlNG8vBZuMGIqNfRCNZrOJ+SnbFzjPtPwavSf8EQZub1fJjliq2bth89r347y4WNoY9lP
+              B94pN2lnanSxIWk855XezgXPcPqmsy1WaYyed4d6zH2wAQAAAIBaHPTQGOc3L4TSDYxaEM
+              boEELWvsv2Ug813G8VWZ5RYqK2ryaD1ryovmNyBEXdjj49FxCZ7V//rmesLDvnU6HlAr/j
+              9x1E/YroeoHsCy3tK2LSAlEZQxhnv/VSY2WUabsTx6ggqMuDKApP9Vtoy67Vj2SHodK+zf
+              2oELYIkSRf1wAAAIEA9j7MsKh6vaiy5F5JsV/hlkzKSYH1oMWxhD31vPnz1cjkSMXO9vXa
+              CmqmWV2PHuS8ACA8V72JlRewjs7n1//2/RNbIhIZau/0NmbtnAN6BWTro404+LlSCikmAK
+              ybiym8BV2r4SJTEhREl1STgrWBBCzn0hKRYdo2sMN+w5Pk07kAAACBAPQ84iM5dDfVXf3R
+              Ck/Bt8pkNKGhln9/8o5LjvUOx++vKU76ZIItI3sljmzDL2jkcBQDPXMfM9qfIOfZ1+B7PK
+              uRNcHbCotf4BUTDz9HEffEuW5dA8WTKcGximubfubbJufLKcKhyHq43kE1aoBXWk24Cmjf
+              BuGKIzYp5n20zJP7AAAADWp6aWRlYUBKWjU1NTABAgMEBQ==
+              -----END OPENSSH PRIVATE KEY-----
+          - path: /etc/sysctl.conf
+            permissions: '0644'
+            owner: root:root
+            content: |
+              vm.overcommit_memory = 2
+              vm.overcommit_ratio = 95
+              net.ipv4.ip_local_port_range = 10000 65535
+              kernel.sem = 250 2048000 200 8192
+              kernel.sysrq = 1
+              kernel.core_uses_pid = 1
+              kernel.msgmnb = 65536
+              kernel.msgmax = 65536
+              kernel.msgmni = 2048
+              net.ipv4.tcp_syncookies = 1
+              net.ipv4.conf.default.accept_source_route = 0
+              net.ipv4.tcp_max_syn_backlog = 4096
+              net.ipv4.conf.all.arp_filter = 1
+              net.core.netdev_max_backlog = 10000
+              net.core.rmem_max = 2097152
+              net.core.wmem_max = 2097152
+              vm.swappiness = 10
+              vm.zone_reclaim_mode = 0
+              vm.dirty_expire_centisecs = 500
+              vm.dirty_writeback_centisecs = 100
+          - path: /etc/security/limits.conf
+            permissions: '0644'
+            owner: root:root
+            content: |
+              * soft nofile 524288
+              * hard nofile 524288
+              * soft nproc 131072
+              * hard nproc 131072
+          - path: /etc/ntp.conf
+            permissions: '0644'
+            owner: root:root
+            content: |
+              driftfile /var/lib/ntp/drift
+              restrict default nomodify notrap nopeer noquery
+              restrict 127.0.0.1
+              restrict ::1
+              includefile /etc/ntp/crypto/pw
+              keys /etc/ntp/keys
+              disable monitor
+              server mdw prefer
+              server ${input.ntp}
+          - path: /opt/gp_prepare.sh
+            permissions: '0744'
+            owner: root:root
+            content: |
+              #!/bin/bash
+              sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+              rm -rf /etc/security/limits.d/*
+              # SYSCTL
+              echo "kernel.shmall = $(expr $(getconf _PHYS_PAGES) / 2)" >> /etc/sysctl.conf
+              echo "kernel.shmmax = $(expr $(getconf _PHYS_PAGES) / 2 \* $(getconf PAGE_SIZE))" >> /etc/sysctl.conf
+              if [ 65536 -gt 8192 ]; then
+                echo "vm.dirty_background_ratio = 0" >> /etc/sysctl.conf
+                echo "vm.dirty_ratio = 0" >> /etc/sysctl.conf
+              else
+                echo "vm.dirty_background_ratio = 3" >> /etc/sysctl.conf
+                echo "vm.dirty_ratio = 10" >> /etc/sysctl.conf
+                echo "vm.dirty_background_bytes = 1610612736" >> /etc/sysctl.conf
+                echo "vm.dirty_bytes = 4294967296" >> /etc/sysctl.conf
+              fi
+              # GRUB
+              grubby --update-kernel=ALL --args="transparent_hugepage=never"
+              # IPC
+              echo "RemoveIPC=no" >> /etc/systemd/logind.conf
+              # SSH
+              echo "MaxStartups 10:30:200" >> /etc/ssh/sshd_config
+              echo "MaxSessions 200" >> /etc/ssh/sshd_config
+              sed -i '/StrictHostKeyChecking/d' /etc/ssh/ssh_config
+              sed -i '/UserKnownHostsFile/d' /etc/ssh/ssh_config
+              echo "StrictHostKeyChecking no" >> /etc/ssh/ssh_config
+              echo "UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config
+              # HOSTNAMES
+              echo "smdw" > /etc/hostname
+              echo "${input._computeType_=="vmw"?resource.mdw.networks[1].address:resource.mdw.networks[0].address} mdw" >> /etc/hosts
+              # GP Data Storage Area
+              DISK=${input._computeType_=="vmw"?"sdb":"xvdf"}
+              mkdir -p /data
+              mkfs.xfs /dev/$DISK
+              mount /dev/$DISK /data
+              echo "/dev/$DISK /data xfs defaults 0 0" >> /etc/fstab
+              mkdir -p /data/master
+              chown gpadmin:gpadmin /data/master
+              # GPDB Package
+              yum update -y
+              yum install -y epel-release
+              yum install -y apr apr-util bash bzip2 curl krb5-devel libcurl libevent libxml2 libyaml zlib openldap openssh openssl openssl-libs perl readline rsync R sed tar zip ntp wget
+              mkdir -p /gpdb
+              wget --no-check-certificate https://download.vmkloud.com/share/images/vmware/gpdb/greenplum-db-${input.version}-rhel7-x86_64.rpm -O /gpdb/greenplum-db.rpm
+              rpm --install /gpdb/greenplum-db.rpm --prefix=/gpdb
+              chown -R gpadmin:gpadmin /gpdb/greenplum*
+              chgrp -R gpadmin /gpdb/greenplum*
+              echo "source /gpdb/greenplum-db/greenplum_path.sh" >> /home/gpadmin/.bashrc
+              # ENABLE GP INIT
+              systemctl enable gp_init.service
+          - path: /lib/systemd/system/gp_init.service
+            permissions: '0644'
+            owner: root:root
+            content: |
+              [Unit]
+              Description=GPDB Init Service
+              After=sshd.service
+              [Service]
+              Type=oneshot
+              ExecStart=/opt/gp_init.sh
+              RemainAfterExit=yes
+              TimeoutSec=0
+              KillMode=process
+              TasksMax=infinity
+              StandardOutput=journal+console
+              [Install]
+              WantedBy=multi-user.target
+          - path: /opt/gp_init.sh
+            permissions: '0744'
+            owner: root:root
+            content: |
+              #!/bin/bash
+              if [ ! -f /etc/gp-deploy ]; then
+                echo PREPARED > /etc/gp-deploy
+                while true; do
+                  PREPARED=$(ssh gpadmin@mdw -o ConnectTimeout=2 "sudo cat /etc/gp-deploy")
+                  if [ "$PREPARED" == "PREPARED" ]; then
+                    break
+                  fi
+                  echo "Wait MDW Prepared : $PREPARED"
+                  sleep 3
+                done
+                MYADDR=$(ip addr | grep "^${input._computeType_=="vmw"?3:2}:" -A 3 | grep "inet " | awk '{print $2}' | sed "s/\/.*//")
+                ssh gpadmin@mdw "sudo /opt/gp_tgt.sh smdw smdw $MYADDR"
+              fi
+        runcmd:
+          - /opt/gp_prepare.sh > /var/log/gp_prepare.log
+          - reboot
+      attachedDisks: ${map_to_object(slice(resource.smdwDisk[*].id, 0, 1), "source")}
+  sdw:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 3
+        - 2
+    allocatePerInstance: true
+    properties:
+      image: ${input._image_}
+      flavor: ${input.sdwFlavor}
+      count: ${input.sdwCount}
+      placementPolicy: ${input._computeType_=="vmw"?"true":"false"}
+      networks: ${[{"network":resource.intNet.id,"assignment":input._computeType_=="vmw"?"static":"dynamic","deviceIndex":input._computeType_=="vmw"?1:0}]+[input._computeType_=="vmw"?{"network":resource.extNet.id,"assignment":"static","deviceIndex":0}:null]}
+      constraints:
+        - tag: ${input.computeTag}
+      cloudConfig: |
+        #cloudConfig
+        users:
+          - name: ${input.username}
+            sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            ssh_authorized_keys:
+              - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDq7mtVrIowKXJ1V+kcAuRd+ZwTkqk7aDG31lJrI3BizU/tNODAoql2ga8oqLpAvuQzyWoDCfxengoU17zwICb11IbYTBvdFJrdeFwlVXslqJUXOtbRy/WfLPbfEvxiDC+WIa/sT61vNPogzmD0QAZ5fOiUo5K5z1TgNd6iuhrIRRVylzdk+572934tNM4dTS6nYZkf1BIm1UmsWad2FDkHp40/YsYwfJ8hd5xmU5UfBxNew3aDo2EEN3RHw8SAh+f2Dm5HUa8HexuqrlqkaHDVgIawmRtwlAnuKuMEZHtzjAa+KBdd+8wYqiRLIeOY9XeQzjZakv3pAtTi7joyWtFj
+            lock_passwd: false
+          - name: gpadmin
+            sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            ssh_authorized_keys:
+              - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDq7mtVrIowKXJ1V+kcAuRd+ZwTkqk7aDG31lJrI3BizU/tNODAoql2ga8oqLpAvuQzyWoDCfxengoU17zwICb11IbYTBvdFJrdeFwlVXslqJUXOtbRy/WfLPbfEvxiDC+WIa/sT61vNPogzmD0QAZ5fOiUo5K5z1TgNd6iuhrIRRVylzdk+572934tNM4dTS6nYZkf1BIm1UmsWad2FDkHp40/YsYwfJ8hd5xmU5UfBxNew3aDo2EEN3RHw8SAh+f2Dm5HUa8HexuqrlqkaHDVgIawmRtwlAnuKuMEZHtzjAa+KBdd+8wYqiRLIeOY9XeQzjZakv3pAtTi7joyWtFj
+            lock_passwd: false
+        chpasswd:
+          list:
+            - ${input.username}:${input.password}
+            - gpadmin:${input.password}
+          expire: False
+        ssh_pwauth: true
+        package_update: false
+        package_upgrade: false
+        write_files:
+          - path: /root/.ssh/id_rsa
+            permissions: '0600'
+            owner: root:root
+            content: |
+              -----BEGIN OPENSSH PRIVATE KEY-----
+              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
+              -----END OPENSSH PRIVATE KEY-----
+          - path: /etc/sysctl.conf
+            permissions: '0644'
+            owner: root:root
+            content: |
+              vm.overcommit_memory = 2
+              vm.overcommit_ratio = 95
+              net.ipv4.ip_local_port_range = 10000 65535
+              kernel.sem = 250 2048000 200 8192
+              kernel.sysrq = 1
+              kernel.core_uses_pid = 1
+              kernel.msgmnb = 65536
+              kernel.msgmax = 65536
+              kernel.msgmni = 2048
+              net.ipv4.tcp_syncookies = 1
+              net.ipv4.conf.default.accept_source_route = 0
+              net.ipv4.tcp_max_syn_backlog = 4096
+              net.ipv4.conf.all.arp_filter = 1
+              net.core.netdev_max_backlog = 10000
+              net.core.rmem_max = 2097152
+              net.core.wmem_max = 2097152
+              vm.swappiness = 10
+              vm.zone_reclaim_mode = 0
+              vm.dirty_expire_centisecs = 500
+              vm.dirty_writeback_centisecs = 100
+          - path: /etc/security/limits.conf
+            permissions: '0644'
+            owner: root:root
+            content: |
+              * soft nofile 524288
+              * hard nofile 524288
+              * soft nproc 131072
+              * hard nproc 131072
+          - path: /etc/ntp.conf
+            permissions: '0644'
+            owner: root:root
+            content: |
+              driftfile /var/lib/ntp/drift
+              restrict default nomodify notrap nopeer noquery
+              restrict 127.0.0.1
+              restrict ::1
+              includefile /etc/ntp/crypto/pw
+              keys /etc/ntp/keys
+              disable monitor
+              server mdw prefer
+              server smdw
+          - path: /opt/gp_prepare.sh
+            permissions: '0744'
+            owner: root:root
+            content: |
+              #!/bin/bash
+              sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+              rm -rf /etc/security/limits.d/*
+              # SYSCTL
+              echo "kernel.shmall = $(expr $(getconf _PHYS_PAGES) / 2)" >> /etc/sysctl.conf
+              echo "kernel.shmmax = $(expr $(getconf _PHYS_PAGES) / 2 \* $(getconf PAGE_SIZE))" >> /etc/sysctl.conf
+              if [ 65536 -gt 8192 ]; then
+                echo "vm.dirty_background_ratio = 0" >> /etc/sysctl.conf
+                echo "vm.dirty_ratio = 0" >> /etc/sysctl.conf
+              else
+                echo "vm.dirty_background_ratio = 3" >> /etc/sysctl.conf
+                echo "vm.dirty_ratio = 10" >> /etc/sysctl.conf
+                echo "vm.dirty_background_bytes = 1610612736" >> /etc/sysctl.conf
+                echo "vm.dirty_bytes = 4294967296" >> /etc/sysctl.conf
+              fi
+              # GRUB
+              grubby --update-kernel=ALL --args="transparent_hugepage=never"
+              # IPC
+              echo "RemoveIPC=no" >> /etc/systemd/logind.conf
+              # SSH
+              echo "MaxStartups 10:30:200" >> /etc/ssh/sshd_config
+              echo "MaxSessions 200" >> /etc/ssh/sshd_config
+              sed -i '/StrictHostKeyChecking/d' /etc/ssh/ssh_config
+              sed -i '/UserKnownHostsFile/d' /etc/ssh/ssh_config
+              echo "StrictHostKeyChecking no" >> /etc/ssh/ssh_config
+              echo "UserKnownHostsFile /dev/null" >> /etc/ssh/ssh_config
+              # HOSTNAMES
+              echo "sdw${count.index + 1}" > /etc/hostname
+              echo "${input._computeType_=="vmw"?resource.mdw.networks[1].address:resource.mdw.networks[0].address} mdw" >> /etc/hosts
+              # GP Data Storage Area
+              DISK=${input._computeType_=="vmw"?"sdb":"xvdf"}
+              mkdir -p /data
+              mkfs.xfs /dev/$DISK
+              mount /dev/$DISK /data
+              echo "/dev/$DISK /data xfs defaults 0 0" >> /etc/fstab
+              mkdir -p /data/primary
+              mkdir -p /data/mirror
+              chown gpadmin:gpadmin /data/*
+              # GPDB Package
+              yum update -y
+              yum install -y epel-release
+              yum install -y apr apr-util bash bzip2 curl krb5-devel libcurl libevent libxml2 libyaml zlib openldap openssh openssl openssl-libs perl readline rsync R sed tar zip ntp wget
+              mkdir -p /gpdb
+              wget --no-check-certificate https://download.vmkloud.com/share/images/vmware/gpdb/greenplum-db-${input.version}-rhel7-x86_64.rpm -O /gpdb/greenplum-db.rpm
+              rpm --install /gpdb/greenplum-db.rpm --prefix=/gpdb
+              chown -R gpadmin:gpadmin /gpdb/greenplum*
+              chgrp -R gpadmin /gpdb/greenplum*
+              echo "source /gpdb/greenplum-db/greenplum_path.sh" >> /home/gpadmin/.bashrc
+              # ENABLE GP INIT
+              systemctl enable gp_init.service
+          - path: /lib/systemd/system/gp_init.service
+            permissions: '0644'
+            owner: root:root
+            content: |
+              [Unit]
+              Description=GPDB Init Service
+              After=sshd.service
+              [Service]
+              Type=oneshot
+              ExecStart=/opt/gp_init.sh
+              RemainAfterExit=yes
+              TimeoutSec=0
+              KillMode=process
+              TasksMax=infinity
+              StandardOutput=journal+console
+              [Install]
+              WantedBy=multi-user.target
+          - path: /opt/gp_init.sh
+            permissions: '0744'
+            owner: root:root
+            content: |
+              #!/bin/bash
+              if [ ! -f /etc/gp-deploy ]; then
+                echo PREPARED > /etc/gp-deploy
+                while true; do
+                  PREPARED=$(ssh gpadmin@mdw -o ConnectTimeout=2 "sudo cat /etc/gp-deploy")
+                  if [ "$PREPARED" == "PREPARED" ]; then
+                    break
+                  fi
+                  echo "Wait MDW Prepared : $PREPARED"
+                  sleep 3
+                done
+                MYADDR=$(ip addr | grep "^${input._computeType_=="vmw"?3:2}:" -A 3 | grep "inet " | awk '{print $2}' | sed "s/\/.*//")
+                ssh gpadmin@mdw "sudo /opt/gp_tgt.sh sdw sdw${count.index + 1} $MYADDR"
+              fi
+        runcmd:
+          - /opt/gp_prepare.sh > /var/log/gp_prepare.log
+          - reboot
+      attachedDisks: ${map_to_object(slice(resource.sdwDisk[*].id, count.index, count.index+1), "source")}
+  mdwDisk:
+    type: Cloud.Volume
+    metadata:
+      layoutPosition:
+        - 4
+        - 0
+    properties:
+      capacityGb: ${input.mdwDisk}
+  smdwDisk:
+    type: Cloud.Volume
+    metadata:
+      layoutPosition:
+        - 4
+        - 1
+    allocatePerInstance: true
+    properties:
+      capacityGb: ${input.mdwDisk}
+      count: ${input.mdwStandby==true?1:0}
+  sdwDisk:
+    type: Cloud.Volume
+    metadata:
+      layoutPosition:
+        - 4
+        - 2
+    allocatePerInstance: true
+    properties:
+      capacityGb: ${input.sdwDisk}
+      count: ${input.sdwCount}

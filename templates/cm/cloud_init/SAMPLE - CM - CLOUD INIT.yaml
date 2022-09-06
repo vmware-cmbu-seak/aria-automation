@@ -1,0 +1,96 @@
+formatVersion: 1
+inputs:
+  _projectId_:
+    type: string
+    title: projectId
+  _computeType_:
+    type: string
+    title: computeType
+    readOnly: true
+    $dynamicDefault: /data/vro-actions/com.vmk.inputs/getComputeType?zoneId={{zoneId}}
+  zoneId:
+    type: string
+    title: Cloud
+    $dynamicEnum: /data/vro-actions/com.vmk.inputs.blueprint/getCloudZones?projectId={{_projectId_}}
+  computeTag:
+    type: string
+    title: Compute
+    $dynamicEnum: /data/vro-actions/com.vmk.inputs.blueprint/getComputeTags?zoneId={{zoneId}}
+  flavor:
+    type: string
+    title: Flavor
+    $dynamicEnum: /data/vro-actions/com.vmk.inputs.blueprint/getFlavors
+  networkTag:
+    type: string
+    title: Network
+    $dynamicEnum: /data/vro-actions/com.vmk.inputs.blueprint/getNetworkTags?zoneId={{zoneId}}
+  address:
+    type: string
+    title: IP Address
+    default: ''
+    $dynamicEnum: /data/vro-actions/com.vmk.inputs.blueprint/getAvailableIPAddressesByNetworkTag?zoneId={{zoneId}}&networkTag={{networkTag}}&defaultValue
+  image:
+    type: string
+    title: Image
+    $dynamicEnum: /data/vro-actions/com.vmk.inputs/getImages
+  username:
+    type: string
+    title: Username
+  password:
+    type: string
+    title: Password
+    encrypted: true
+resources:
+  vm:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      image: ${input.image}
+      flavor: ${input.flavor}
+      placementPolicy: ${input._computeType_=="vmw"?"true":"false"}
+      networks:
+        - network: ${resource.net.id}
+          assignment: static
+          address: ${input.address!=""?input.address:null}
+      constraints:
+        - tag: ${input.computeTag}
+      cloudConfig: |
+        #cloud-config
+        users:
+          - name: ${input.username}
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            lock_passwd: false
+        chpasswd:
+          list: |
+            ${input.username}:${input.password}
+          expire: False
+        ssh_pwauth: true
+        package_update: true
+        package_upgrade: true
+        packages:
+         - apache2
+        write_files:
+          - path: /opt/init.sh
+            permissions: '0744'
+            owner: root:root
+            content: |
+              #!/bin/bash
+              service apache2 restart
+        runcmd:
+          - /opt/init.sh
+          - rm -rf /opt/init.sh
+  net:
+    type: Cloud.Network
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${input.networkTag}

@@ -1,0 +1,25 @@
+function Handler($context, $inputs) {
+    $vcHostname = $inputs.vcHostname
+    $vcUsername = $inputs.vcUsername
+    $vcPassword = $inputs.vcPassword
+    $vmName = $inputs.vmName
+    $vmUsername = $inputs.vmUsername
+    $vmPassword = $inputs.vmPassword
+    $scripts = $inputs.scripts
+
+    Set-PowerCLIConfiguration -InvalidCertificateAction Ignore -Confirm:$false | Out-Null
+    Connect-VIServer $vcHostname -User $vcUsername -Password $vcPassword | Out-Null
+    $vm = Get-vm -name $vmName
+
+    $tries = 0
+    while ($tries -lt 10) {
+        Wait-Tools -VM $vm -TimeoutSeconds 600 | Out-Null
+        $invokeOutput = Invoke-VMScript -VM $vm -ScriptText $scripts -GuestUser $vmUsername -GuestPassword $vmPassword -ToolsWaitSecs 3600
+        if ($?) {
+            return $invokeOutput.ScriptOutput
+        }
+        $tries++
+        Start-Sleep -Milliseconds 5000 | Out-Null
+    }
+    throw "Error [execScripts] : could not execute scripts"
+}

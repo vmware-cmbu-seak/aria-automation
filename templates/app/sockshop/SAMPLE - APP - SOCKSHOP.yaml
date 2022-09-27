@@ -1,9 +1,12 @@
 formatVersion: 1
 inputs:
+  _projectId_:
+    type: string
+    title: projectId
   kubernetes:
     type: string
     title: Kubernetes
-    $dynamicEnum: /data/vro-actions/com.vmk.inputs/getKubernetes
+    $dynamicEnum: /data/vro-actions/com.vmk.inputs/getKubernetes?projectId={{_projectId_}}
   namespace:
     type: string
     title: Namespace

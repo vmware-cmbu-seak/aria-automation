@@ -15,8 +15,7 @@ REPO_UPGRADE=true			# trigger upgrade task
 SSL_PUB_KEY=""				# set your master public ssh key
 TIME_ZONE="Asia/Seoul"		# set your timezone
 
-# 1. remove non-cloudic packages
-
+# remove non-cloudic packages
 ## swap system off			# check stable way
 if [ $SWAP_OFF == true ]; then
 swapoff -a

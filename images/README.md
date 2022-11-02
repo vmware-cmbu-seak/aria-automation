@@ -10,10 +10,17 @@
  - Please clean garbage files such as pre-version packages
 
 ```
- yum : yum clean all
- apt : apt autoremove
+[ RHEL / CentOS / LockyOS ]
+# yum clean all
+
+[ Debian / Ubuntu ]
+# apt autoremove
 ```
    
- - Be ensure to finish your task through typing "vra-ready" with root account
+ - Be ensure to finish your task through typing such as following via root account
+
+```
+$ vra-ready
+```
 
 ## "vra-init" <a href="./vra-init">Source Scripts</a>

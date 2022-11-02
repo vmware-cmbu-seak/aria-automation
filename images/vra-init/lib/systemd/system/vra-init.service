@@ -1,0 +1,15 @@
+[Unit]
+Description=vRealize Automation Init Service
+After=vmware-tools.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/vra-init
+RemainAfterExit=yes
+TimeoutSec=0
+KillMode=process
+TasksMax=infinity
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target

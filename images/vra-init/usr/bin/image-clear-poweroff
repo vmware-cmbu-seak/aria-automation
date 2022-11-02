@@ -1,0 +1,11 @@
+#!/bin/bash
+rm -rf /tmp/*
+rm -rf /var/tmp/*
+rm -rf /var/log/vmware-*
+rm -rf /var/log/cloud-*
+for fd in $(find /var/log | grep ".gz"); do rm -rf $fd; done
+for fd in $(find /var/log | grep ".tz"); do rm -rf $fd; done
+for fd in $(find /var/log | grep ".zip"); do rm -rf $fd; done
+for fd in $(find /var/log | grep ".bz2"); do rm -rf $fd; done
+rm -rf ~/.bash_history
+poweroff

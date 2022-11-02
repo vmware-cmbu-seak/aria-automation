@@ -1,0 +1,14 @@
+#!/bin/bash
+# Enable vra-init
+systemctl enable vra-init
+# Remove vra-init Phase Checker
+rm -rf /etc/vra-ready
+# Remove Ubuntu Network Files
+rm -rf /etc/network/interfaces
+rm -rf /etc/netplan/*
+# Remove CentOS Network FIles
+rm -rf /etc/sysconfig/network-scripts/ifcfg-*
+# Remove Cloud init Data
+rm -rf /var/lib/cloud/*
+# General Clearing
+/usr/bin/image-clear-poweroff

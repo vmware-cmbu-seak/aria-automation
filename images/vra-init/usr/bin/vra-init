@@ -1,0 +1,31 @@
+#!/bin/bash
+CHECK_NETWORK_TICK=1
+function _check_network {
+    local DEV_NAME=`ip link | grep "^2:" | awk '{print $2}' | sed -e 's/://g'`
+    if [ -z "$DEV_NAME" ]; then return 1; fi
+    if [ -z "`ip addr show dev $DEV_NAME | grep "inet " | awk '{print $2}' | sed -e 's/\/.\+//g'`" ]; then return 1; fi
+    return 0
+}
+function check_network {
+    while true; do
+        _check_network
+        if [ $? ==  0 ]; then break; fi
+        sleep $CHECK_NETWORK_TICK
+    done
+}
+function _start_cloud_init {
+    /usr/bin/cloud-init init --local
+    /usr/bin/cloud-init init
+    /usr/bin/cloud-init modules --mode=config
+    /usr/bin/cloud-init modules --mode=final
+}
+function start_cloud_init {
+    check_network
+    _start_cloud_init 2>&1 >/var/log/cloud-init.log &
+}
+if [ -f /etc/vra-ready ]; then
+    if [ "OK" != "$(cat /etc/vra-ready)" ]; then start_cloud_init; fi
+    echo "OK" > /etc/vra-ready
+else
+    touch /etc/vra-ready
+fi

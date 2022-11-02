@@ -9,5 +9,5 @@
 
 ## Install Scripts
 
- - <a href="./blob/main/images/centos8.sh">CentOS 8</a>
- - <a href="./blob/main/images/ubuntu20.sh">Ubuntu 20</a>
+ - <a href="./centos8.sh">CentOS 8</a>
+ - <a href="./ubuntu20.sh">Ubuntu 20</a>

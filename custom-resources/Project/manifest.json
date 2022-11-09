@@ -1,0 +1,120 @@
+{
+	"name": "Project",
+	"inputs": {
+		"create": {},
+		"read": {},
+		"update": {},
+		"delete": {}
+	},
+	"constants": {
+		"create": [
+			"VraManager"
+		],
+		"read": [],
+		"update": [
+			"VraManager"
+		],
+		"delete": [
+			"VraManager"
+		]
+	},
+	"properties": {
+		"name": {
+			"type": "string",
+			"title": "Name",
+			"description": "Unique name of project"
+		},
+		"description": {
+			"type": "string",
+			"title": "Description",
+			"default": "",
+			"description": "Project descriptions"
+		},
+		"catalogs": {
+			"type": "array",
+			"title": "Catalogs",
+			"default": [],
+			"items": {
+				"type": "string"
+			},
+			"description": "Permitted usable catalogs"
+		},
+		"sharedResources": {
+			"type": "boolean",
+			"title": "Shared Resources",
+			"default": true,
+			"description": "Deployments are shared between all users in the project"
+		},
+		"administrators": {
+			"type": "array",
+			"title": "Administrators",
+			"default": [],
+			"items": {
+				"type": "string"
+			},
+			"description": "Accounts of administrator user"
+		},
+		"members": {
+			"type": "array",
+			"title": "Members",
+			"default": [],
+			"items": {
+				"type": "string"
+			},
+			"description": "Accounts of member user"
+		},
+		"viewers": {
+			"type": "array",
+			"title": "Viewers",
+			"default": [],
+			"items": {
+				"type": "string"
+			},
+			"description": "Accounts of viewer user"
+		},
+		"zones": {
+			"type": "array",
+			"title": "Zones",
+			"default": [],
+			"items": {
+				"type": "string"
+			},
+			"description": "Specify the zones ID that can be used when users provision deployments in this project"
+		},
+		"placementPolicy": {
+			"type": "string",
+			"title": "Placement Policy",
+			"default": "default",
+			"enum": [
+				"default",
+				"spread"
+			],
+			"description": "Specify the placement policy that will be applied when selecting a cloud zone for provisioning"
+		},
+		"customProperties": {
+			"type": "object",
+			"title": "Custom Properties",
+			"default": {},
+			"description": "Specify the custom properties that should be added to all requests in this project"
+		},
+		"machineNamingTemplate": {
+			"type": "string",
+			"title": "Machine Naming Template",
+			"default": "",
+			"description": "Specify the naming template to be used for machines, networks, security groups and disks provisioned in this project"
+		},
+		"operationTimeout": {
+			"type": "integer",
+			"title": "Operation Timeout",
+			"default": 0,
+			"description": "Request timeout seconds"
+		},
+		"policyId": {
+			"type": "string",
+			"title": "Catalog Policy Id",
+			"readOnly": true,
+			"default": "",
+			"description": "Reference of catalog policy"
+		}
+	}
+}

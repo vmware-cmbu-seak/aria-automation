@@ -5,9 +5,10 @@ inputs:
     title: catalogs
     readOnly: true
     default:
-      - VPC - NET
       - VM - BASIC
       - VM - ADVANCED
+      - APP - WORDPRESS
+      - K8S - OSS
   _computes_:
     type: array
     title: computes
@@ -20,6 +21,16 @@ inputs:
     title: folder
     readOnly: true
     default: FL-VMKLOUD
+  _onDemandNetworkTag_:
+    type: string
+    title: onDemandNetworkTag
+    readOnly: true
+    default: network:demand
+  _domain_:
+    type: string
+    title: domain
+    readOnly: true
+    default: vmkloud.com
   _transportZone_:
     type: string
     title: transportZone
@@ -45,11 +56,6 @@ inputs:
     title: subnetSize
     readOnly: true
     default: 24
-  _onDemandNetworkTag_:
-    type: string
-    title: onDemandNetworkTag
-    readOnly: true
-    default: network:demand
   _storage_:
     type: string
     title: storage
@@ -66,6 +72,38 @@ inputs:
   owner:
     type: string
     title: Owner
+  internals:
+    type: array
+    title: Internal Networks
+    minItems: 0
+    maxItems: 3
+    default: []
+    items:
+      type: object
+      title: Internal Network
+      properties:
+        name:
+          type: string
+          title: Name
+        networkCidr:
+          type: string
+          title: Network CIDR
+  privates:
+    type: array
+    title: Private Networks
+    minItems: 0
+    maxItems: 3
+    default: []
+    items:
+      type: object
+      title: Private Network
+      properties:
+        name:
+          type: string
+          title: Name
+        networkCidr:
+          type: string
+          title: Network CIDR
 resources:
   project:
     type: Custom.Project
@@ -84,7 +122,7 @@ resources:
   vpz:
     type: Custom.VirtualPrivateZone
     dependsOn:
-      - gw
+      - externalRouter
     metadata:
       layoutPosition:
         - 1
@@ -94,34 +132,33 @@ resources:
       computes: ${input._computes_}
       placementPolicy: default
       folder: ${input._folder_}/${input.name}
-      networks:
-        - ${resource.net.id}
+      networks: ${[resource.external.id] + resource.internal1[*].id + resource.internal2[*].id + resource.internal3[*].id + resource.private1[*].id + resource.private2[*].id + resource.private3[*].id}
       loadBalancers:
-        - ${resource.lb.id}
+        - ${resource.serviceLb.id}
       transportZone: ${input._transportZone_}
-      externalNetwork: ${resource.net.id}
+      externalNetwork: ${resource.external.id}
       tier0Router: ${input._tier0Router_}
       edgeCluster: ${input._edgeCluster_}
       networkCIDR: ${input._networkCIDR_}
       subnetSize: ${input._subnetSize_}
       storage: ${input._storage_}
       storageType: ${input._storageType_}
-  gw:
+  externalRouter:
     type: Cloud.NSX.Gateway
     metadata:
       layoutPosition:
-        - 2
-        - 0
+        - 1
+        - 1
     properties:
-      name: ${input.name}
+      name: ${input.name}-ext
       networks:
-        - ${resource.net.id}
-  lb:
+        - ${resource.external.id}
+  serviceLb:
     type: Cloud.NSX.LoadBalancer
     metadata:
       layoutPosition:
-        - 2
         - 1
+        - 2
     properties:
       name: ${input.name}
       routes:
@@ -131,19 +168,131 @@ resources:
           instancePort: 1
       instances: []
       internetFacing: false
-      network: ${resource.net.id}
-      gateway: ${resource.gw.id}
-  net:
+      network: ${resource.external.id}
+      gateway: ${resource.externalRouter.id}
+  external:
     type: Cloud.NSX.Network
     metadata:
       layoutPosition:
-        - 3
+        - 2
         - 0
     properties:
-      name: public
+      name: ext-${input.name}
       networkType: routed
       constraints:
         - tag: ${input._onDemandNetworkTag_}
       tags:
         - key: vpc
-          value: public
+          value: ext
+  internalRouter:
+    type: Cloud.NSX.Gateway
+    metadata:
+      layoutPosition:
+        - 3
+        - 1
+    properties:
+      name: ${env.projectName}-int
+      networks: ${resource.internal1[*].id + resource.internal2[*].id + resource.internal3[*].id}
+      count: ${length(input.internals)>0?1:0}
+  internal1:
+    type: Cloud.NSX.Network
+    metadata:
+      layoutPosition:
+        - 4
+        - 0
+    properties:
+      name: int1-${input.internals[0].name}-${input.internals[0].networkCidr}
+      networkType: outbound
+      domain: ${input._domain_}
+      networkCidr: ${input.internals[0].networkCidr}
+      constraints:
+        - tag: ${input._onDemandNetworkTag_}
+      tags:
+        - key: vpc
+          value: int1
+      count: ${length(input.internals)>0?1:0}
+  internal2:
+    type: Cloud.NSX.Network
+    metadata:
+      layoutPosition:
+        - 5
+        - 0
+    properties:
+      name: int2-${input.internals[1].name}-${input.internals[1].networkCidr}
+      networkType: outbound
+      domain: ${input._domain_}
+      networkCidr: ${input.internals[1].networkCidr}
+      constraints:
+        - tag: ${input._onDemandNetworkTag_}
+      tags:
+        - key: vpc
+          value: int2
+      count: ${length(input.internals)>1?1:0}
+  internal3:
+    type: Cloud.NSX.Network
+    metadata:
+      layoutPosition:
+        - 6
+        - 0
+    properties:
+      name: int3-${input.internals[2].name}-${input.internals[2].networkCidr}
+      networkType: outbound
+      domain: ${input._domain_}
+      networkCidr: ${input.internals[2].networkCidr}
+      constraints:
+        - tag: ${input._onDemandNetworkTag_}
+      tags:
+        - key: vpc
+          value: int3
+      count: ${length(input.internals)>2?1:0}
+  private1:
+    type: Cloud.NSX.Network
+    metadata:
+      layoutPosition:
+        - 7
+        - 0
+    properties:
+      name: pri1-${input.privates[0].name}-${input.privates[0].networkCidr}
+      networkType: private
+      domain: ${input._domain_}
+      networkCidr: ${input.privates[0].networkCidr}
+      constraints:
+        - tag: ${input._onDemandNetworkTag_}
+      tags:
+        - key: vpc
+          value: pri1
+      count: ${length(input.privates)>0?1:0}
+  private2:
+    type: Cloud.NSX.Network
+    metadata:
+      layoutPosition:
+        - 8
+        - 0
+    properties:
+      name: pri2-${input.privates[1].name}-${input.privates[1].networkCidr}
+      networkType: private
+      domain: ${input._domain_}
+      networkCidr: ${input.privates[1].networkCidr}
+      constraints:
+        - tag: ${input._onDemandNetworkTag_}
+      tags:
+        - key: vpc
+          value: pri2
+      count: ${length(input.privates)>1?1:0}
+  private3:
+    type: Cloud.NSX.Network
+    metadata:
+      layoutPosition:
+        - 9
+        - 0
+    properties:
+      name: pri3-${input.privates[2].name}-${input.privates[2].networkCidr}
+      networkType: private
+      domain: ${input._domain_}
+      networkCidr: ${input.privates[2].networkCidr}
+      constraints:
+        - tag: ${input._onDemandNetworkTag_}
+      tags:
+        - key: vpc
+          value: pri3
+      count: ${length(input.privates)>2?1:0}

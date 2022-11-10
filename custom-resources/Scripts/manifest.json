@@ -25,7 +25,7 @@
 			"items": {
 				"type": "string"
 			},
-			"description": "instance array to run scripts"
+			"description": "Instance array to run scripts"
 		},
 		"osType": {
 			"type": "string",
@@ -34,36 +34,36 @@
 				"linux",
 				"windows"
 			],
-			"description": "os type to run scripts"
+			"description": "OS type to run scripts"
 		},
 		"username": {
 			"type": "string",
 			"title": "Username",
-			"description": "username in vm to run scripts"
+			"description": "Username in vm to run scripts"
 		},
 		"password": {
 			"type": "string",
 			"title": "Password",
 			"encrypted": true,
-			"description": "password in vm to run scripts"
+			"description": "Password in vm to run scripts"
 		},
 		"install": {
 			"type": "string",
 			"title": "Install Scripts",
 			"default": "",
-			"description": "only run script when first deployed"
+			"description": "Only run script when first deployed"
 		},
 		"configure": {
 			"type": "string",
 			"title": "Configure Scripts",
 			"default": "",
-			"description": "run script when post install and scripts updated"
+			"description": "Run script when post install and scripts updated"
 		},
 		"destroy": {
 			"type": "string",
 			"title": "Destroy Scripts",
 			"default": "",
-			"description": "run script when destroyed"
+			"description": "Run script when destroyed"
 		},
 		"targets": {
 			"type": "array",

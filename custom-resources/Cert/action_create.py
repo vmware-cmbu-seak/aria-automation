@@ -103,13 +103,6 @@ def handler(context, inputs):
     keySize = inputs['keySize'] if 'keySize' in inputs and inputs['keySize'] else 2048
     privateKey = subprocess.run('openssl genrsa {}'.format(keySize), shell=True, check=True, capture_output=True).stdout.decode('utf-8').strip()
     
-    print('[INFO] Create Cert Description')
-    print('properties.instances\n{}\n'.format(instances))
-    print('properties.username\n{}\n'.format(username))
-    print('properties.password\n{}\n'.format(password))
-    print('properties.keySize\n{}\n'.format(keySize))
-    print('properties.privateKey\n{}\n'.format(privateKey))
-    
     b64Key = base64.b64encode(privateKey.encode('utf-8')).decode('utf-8')
     scripts = '''# Scripts
 mkdir -p ~/.ssh

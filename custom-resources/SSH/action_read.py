@@ -107,10 +107,10 @@ def handler(context, inputs):
                 error = value[1]
                 output = value[2].strip()
                 print('<sync resource="ssh" address="{}" port="{}">\n<log>{}</log>\n<error>{}</error>\n<output>{}</output>\n</sync>'.format(address, port, log, error, output))
-                inputs['output'] = output
+                inputs['outputs'] = output
                 inputs['state'] = 'Completed'
             elif state == 'failed':
-                inputs['output'] = res['content-exception']
+                inputs['outputs'] = res['content-exception']
                 inputs['state'] = 'Failed'
 
     # publish resource

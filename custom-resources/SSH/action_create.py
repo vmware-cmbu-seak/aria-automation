@@ -107,13 +107,6 @@ def handler(context, inputs):
     inputs['output'] = ''
     delimeter = '__VRA_EXEC_DELIMETER__'
     
-    print('[INFO] Create Description')
-    print('properties.address\n{}\n'.format(address))
-    print('properties.port\n{}\n'.format(port))
-    print('properties.username\n{}\n'.format(username))
-    print('properties.password\n{}\n'.format(password))
-    print('properties.create\n{}\n'.format(create))
-    
     if create:
         commands = '''# Commands
 exec 1>/tmp/{id}.stdout
@@ -161,7 +154,7 @@ cat /tmp/{id}.output 2>/dev/null
         executionId = res['id']
         inputs['executionId'] = executionId
         inputs['state'] = 'Running'
-        inputs['output'] = ''
+        inputs['outputs'] = ''
         if sync:
             for _ in range(0, 450):
                 res = vra.get('/vco/api/workflows/7f6f952b-3254-4a38-8872-fc3082c01bd5/executions/' + executionId + '/state')
@@ -174,7 +167,7 @@ cat /tmp/{id}.output 2>/dev/null
                         error = value[1]
                         output = value[2].strip()
                         print('<create resource="ssh" address="{}" port="{}">\n<log>{}</log>\n<error>{}</error>\n<output>{}</output>\n</create>'.format(address, port, log, error, output))
-                        inputs['output'] = output
+                        inputs['outputs'] = output
                         inputs['state'] = 'Completed'
                         break
                     elif state == 'failed': raise Exception(res['content-exception'])

@@ -24,48 +24,48 @@
 		"address": {
 			"type": "string",
 			"title": "Address",
-			"description": "address to connect host"
+			"description": "Address to connect host"
 		},
 		"port": {
 			"type": "number",
 			"title": "Port",
 			"default": 22,
-			"description": "port to connect host"
+			"description": "Port to connect host"
 		},
 		"username": {
 			"type": "string",
 			"title": "Username",
-			"description": "username in host to run scripts"
+			"description": "Username in host to run scripts"
 		},
 		"password": {
 			"type": "string",
 			"title": "Password",
 			"encrypted": true,
-			"description": "password in host to run scripts"
+			"description": "Password in host to run scripts"
 		},
 		"sync": {
 			"type": "boolean",
 			"title": "Sync Task",
 			"default": true,
-			"description": "run commands as sync"
+			"description": "Run commands as sync"
 		},
 		"create": {
 			"type": "string",
 			"title": "Create Commands",
 			"default": "",
-			"description": "run script when resource created"
+			"description": "Run script when resource created"
 		},
 		"update": {
 			"type": "string",
 			"title": "Update Commands",
 			"default": "",
-			"description": "run script when resource updated"
+			"description": "Run script when resource updated"
 		},
 		"destroy": {
 			"type": "string",
 			"title": "Destroy Scripts",
 			"default": "",
-			"description": "run script when resource destroyed"
+			"description": "Run script when resource destroyed"
 		},
 		"state": {
 			"type": "string",
@@ -79,9 +79,9 @@
 			"readOnly": true,
 			"default": ""
 		},
-		"output": {
+		"outputs": {
 			"type": "string",
-			"title": "Output",
+			"title": "Outputs",
 			"readOnly": true,
 			"default": ""
 		}

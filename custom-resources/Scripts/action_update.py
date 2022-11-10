@@ -106,16 +106,6 @@ def handler(context, inputs):
     destroy = inputs['destroy'] if 'destroy' in inputs and inputs['destroy'] else ''
     delimeter = '__VRA_EXEC_DELIMETER__'
     
-    print('[INFO] Update Scripts Description')
-    print('properties.instances\n{}\n'.format(instances))
-    print('properties.targets\n{}\n'.format(targets))
-    print('properties.osType\n{}\n'.format(osType))
-    print('properties.username\n{}\n'.format(username))
-    print('properties.password\n{}\n'.format(password))
-    print('properties.install\n{}\n'.format(install))
-    print('properties.configure\n{}\n'.format(configure))
-    print('properties.destroy\n{}\n'.format(destroy))
-        
     deleteInstances = []
     for instance in targets:
         if instance not in instances: deleteInstances.append(instance)

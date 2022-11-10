@@ -105,14 +105,6 @@ def handler(context, inputs):
     configure = inputs['configure'] if 'configure' in inputs and inputs['configure'] else ''
     delimeter = '__VRA_EXEC_DELIMETER__'
     
-    print('[INFO] Create Scripts Description')
-    print('properties.instances\n{}\n'.format(instances))
-    print('properties.osType\n{}\n'.format(osType))
-    print('properties.username\n{}\n'.format(username))
-    print('properties.password\n{}\n'.format(password))
-    print('properties.install\n{}\n'.format(install))
-    print('properties.configure\n{}\n'.format(configure))
-    
     if install or configure:
         if osType == 'linux':
             scripts = '''# Scripts

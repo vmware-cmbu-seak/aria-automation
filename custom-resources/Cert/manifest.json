@@ -23,18 +23,18 @@
 			"items": {
 				"type": "string"
 			},
-			"description": "instance array to share cert"
+			"description": "Instance array to share cert"
 		},
 		"username": {
 			"type": "string",
 			"title": "Username",
-			"description": "username in vm to share cert"
+			"description": "Username in vm to share cert"
 		},
 		"password": {
 			"type": "string",
 			"title": "Password",
 			"encrypted": true,
-			"description": "password in vm to share cert"
+			"description": "Password in vm to share cert"
 		},
 		"keySize": {
 			"type": "number",
@@ -42,7 +42,7 @@
 			"default": 2048,
 			"minimum": 1024,
 			"maximum": 8192,
-			"description": "Key Size Bits"
+			"description": "Key size bits"
 		}
 	}
 }

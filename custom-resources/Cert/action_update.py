@@ -100,13 +100,6 @@ def handler(context, inputs):
     if 'password' not in inputs or not inputs['password']: raise Exception('password property must be required') # Required
     password = inputs['password'] = context.getSecret(inputs['password'])
     
-    print('[INFO] Create Cert Description')
-    print('properties.instances\n{}\n'.format(instances))
-    print('properties.targets\n{}\n'.format(targets))
-    print('properties.username\n{}\n'.format(username))
-    print('properties.password\n{}\n'.format(password))
-    print('properties.privateKey\n{}\n'.format(privateKey))
-    
     b64Key = base64.b64encode(privateKey.encode('utf-8')).decode('utf-8')
     scripts = '''# Scripts
 mkdir -p ~/.ssh

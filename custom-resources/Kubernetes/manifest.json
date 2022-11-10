@@ -20,7 +20,7 @@
 		"name": {
 			"type": "string",
 			"title": "Name",
-			"description": "Kubernetes Cluster Name"
+			"description": "Kubernetes cluster name"
 		},
 		"clusterType": {
 			"type": "string",
@@ -29,31 +29,31 @@
 				"tanzu",
 				"external"
 			],
-			"description": "Registered Kubernetes Type"
+			"description": "Registered kubernetes type"
 		},
 		"cluster": {
 			"type": "string",
 			"title": "Cluster ID",
 			"default": "",
-			"description": "Cluster ID in CMX Registered"
+			"description": "Cluster ID in CMX registered"
 		},
 		"project": {
 			"type": "string",
 			"title": "Project Name",
 			"default": "",
-			"description": "Allocated Project Name of External Cluster"
+			"description": "Allocated project name of external cluster"
 		},
 		"kubeConfig": {
 			"type": "string",
 			"title": "Kubernetes Config",
 			"default": "",
-			"description": "Kube-Config of External Cluster"
+			"description": "Kube-Config of external cluster"
 		},
 		"clusterManifest": {
 			"type": "string",
 			"title": "Cluster Manifest",
 			"default": "",
-			"description": "Manifest for Initial Cluster Config"
+			"description": "Manifest for initial cluster config"
 		}
 	}
 }

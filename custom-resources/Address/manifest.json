@@ -21,7 +21,7 @@
 			"type": "string",
 			"title": "Network",
 			"recreateOnUpdate": true,
-			"description": "Network id for ip allocation"
+			"description": "Network ID for IP allocation"
 		},
 		"address": {
 			"type": "string",

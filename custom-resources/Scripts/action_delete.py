@@ -104,13 +104,6 @@ def handler(context, inputs):
     destroy = inputs['destroy'] if 'destroy' in inputs and inputs['destroy'] else ''
     delimeter = '__VRA_EXEC_DELIMETER__'
     
-    print('[INFO] Update Scripts Description')
-    print('properties.instances\n{}\n'.format(instances))
-    print('properties.osType\n{}\n'.format(osType))
-    print('properties.username\n{}\n'.format(username))
-    print('properties.password\n{}\n'.format(password))
-    print('properties.destroy\n{}\n'.format(destroy))
-    
     if destroy:
         if osType == 'linux':
             scripts = '''# Scripts

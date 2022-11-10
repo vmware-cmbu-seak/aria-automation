@@ -104,13 +104,6 @@ def handler(context, inputs):
     destroy = inputs['destroy'] if 'destroy' in inputs and inputs['destroy'] else ''
     delimeter = '__VRA_EXEC_DELIMETER__'
     
-    print('[INFO] Delete Description')
-    print('properties.address\n{}\n'.format(address))
-    print('properties.port\n{}\n'.format(port))
-    print('properties.username\n{}\n'.format(username))
-    print('properties.password\n{}\n'.format(password))
-    print('properties.destroy\n{}\n'.format(destroy))
-    
     if destroy:
         commands = '''# Commands
 exec 1>/tmp/{id}.stdout

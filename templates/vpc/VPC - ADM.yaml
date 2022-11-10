@@ -1,0 +1,149 @@
+formatVersion: 1
+inputs:
+  _catalogs_:
+    type: array
+    title: catalogs
+    readOnly: true
+    default:
+      - VPC - NET
+      - VM - BASIC
+      - VM - ADVANCED
+  _computes_:
+    type: array
+    title: computes
+    readOnly: true
+    default:
+      - CL-ZONE-01 / RP-RANDING
+      - CL-ZONE-02 / RP-RANDING
+  _folder_:
+    type: string
+    title: folder
+    readOnly: true
+    default: FL-VMKLOUD
+  _transportZone_:
+    type: string
+    title: transportZone
+    readOnly: true
+    default: TZ-OVERLAY
+  _tier0Router_:
+    type: string
+    title: tier0Router
+    readOnly: true
+    default: T0-MAIN
+  _edgeCluster_:
+    type: string
+    title: edgeCluster
+    readOnly: true
+    default: EDGE-CLUSTER
+  _networkCIDR_:
+    type: string
+    title: networkCIDR
+    readOnly: true
+    default: 1.1.1.1/1
+  _subnetSize_:
+    type: number
+    title: subnetSize
+    readOnly: true
+    default: 24
+  _onDemandNetworkTag_:
+    type: string
+    title: onDemandNetworkTag
+    readOnly: true
+    default: network:demand
+  _storage_:
+    type: string
+    title: storage
+    readOnly: true
+    default: DS-VMKLOUD
+  _storageType_:
+    type: string
+    title: storageType
+    readOnly: true
+    default: thin
+  name:
+    type: string
+    title: Name
+  owner:
+    type: string
+    title: Owner
+resources:
+  project:
+    type: Custom.Project
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      name: ${input.name}
+      zones:
+        - ${resource.vpz.id}
+      catalogs: ${input._catalogs_}
+      members:
+        - ${input.owner}
+      sharedResources: false
+  vpz:
+    type: Custom.VirtualPrivateZone
+    dependsOn:
+      - gw
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      name: ${input.name}
+      computes: ${input._computes_}
+      placementPolicy: default
+      folder: ${input._folder_}/${input.name}
+      networks:
+        - ${resource.net.id}
+      loadBalancers:
+        - ${resource.lb.id}
+      transportZone: ${input._transportZone_}
+      externalNetwork: ${resource.net.id}
+      tier0Router: ${input._tier0Router_}
+      edgeCluster: ${input._edgeCluster_}
+      networkCIDR: ${input._networkCIDR_}
+      subnetSize: ${input._subnetSize_}
+      storage: ${input._storage_}
+      storageType: ${input._storageType_}
+  gw:
+    type: Cloud.NSX.Gateway
+    metadata:
+      layoutPosition:
+        - 2
+        - 0
+    properties:
+      name: ${input.name}
+      networks:
+        - ${resource.net.id}
+  lb:
+    type: Cloud.NSX.LoadBalancer
+    metadata:
+      layoutPosition:
+        - 2
+        - 1
+    properties:
+      name: ${input.name}
+      routes:
+        - protocol: TCP
+          port: 1
+          instanceProtocol: TCP
+          instancePort: 1
+      instances: []
+      internetFacing: false
+      network: ${resource.net.id}
+      gateway: ${resource.gw.id}
+  net:
+    type: Cloud.NSX.Network
+    metadata:
+      layoutPosition:
+        - 3
+        - 0
+    properties:
+      name: public
+      networkType: routed
+      constraints:
+        - tag: ${input._onDemandNetworkTag_}
+      tags:
+        - key: vpc
+          value: public

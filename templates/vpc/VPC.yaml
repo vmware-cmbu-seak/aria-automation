@@ -1,0 +1,33 @@
+formatVersion: 1
+inputs:
+  _vpcAdminProjectName_:
+    type: string
+    title: vpcAdminProjectName
+    readOnly: true
+    default: vpcadm
+  _vpcAdminTemplateName_:
+    type: string
+    title: vpcAdminTemplateName
+    readOnly: true
+    default: VPC - ADM
+  name:
+    type: string
+    title: Name
+  owner:
+    type: string
+    title: Owner
+resources:
+  vpc:
+    type: Custom.Deployment
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      name: '${input._vpcAdminTemplateName_}: ${input.name}'
+      projectName: ${input._vpcAdminProjectName_}
+      itemName: ${input._vpcAdminTemplateName_}
+      itemType: blueprint
+      inputs:
+        name: ${input.name}
+        owner: ${input.owner}

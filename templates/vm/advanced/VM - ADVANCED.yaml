@@ -8,6 +8,15 @@ inputs:
     title: computeType
     readOnly: true
     $dynamicDefault: /data/vro-actions/com.vmk.inputs/getComputeType?zoneId={{zoneId}}
+  _vmDefaultName_:
+    type: string
+    title: vmDefaultName
+    readOnly: true
+    default: vm
+  name:
+    type: string
+    title: Name
+    default: ''
   zoneId:
     type: string
     title: Cloud
@@ -386,6 +395,7 @@ resources:
     allocatePerInstance: true
     properties:
       count: ${input.vms}
+      name: ${input.name!=""?input.name:input._vmDefaultName_}
       image: ${input.image}
       flavor: ${input.flavor}
       placementPolicy: ${input._computeType_=="vmw"?"true":"false"}
@@ -487,7 +497,7 @@ resources:
         - 5
         - 0
     properties:
-      networkType: ${contains(input.net1,"routed")?"routed":(contains(input.net1,"outbound")?"outbound":"existing")}
+      networkType: existing
       constraints:
         - tag: ${input.net1}
   net2:
@@ -497,7 +507,7 @@ resources:
         - 6
         - 0
     properties:
-      networkType: ${contains(input.net2,"routed")?"routed":(contains(input.net2,"outbound")?"outbound":"existing")}
+      networkType: existing
       constraints:
         - tag: ${input.net2}
       count: ${input.networks>=2?1:0}
@@ -508,7 +518,7 @@ resources:
         - 7
         - 0
     properties:
-      networkType: ${contains(input.net3,"routed")?"routed":(contains(input.net3,"outbound")?"outbound":"existing")}
+      networkType: existing
       constraints:
         - tag: ${input.net3}
       count: ${input.networks>=3?1:0}

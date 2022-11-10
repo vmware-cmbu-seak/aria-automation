@@ -104,7 +104,6 @@ def handler(context, inputs):
     password = inputs['password'] = context.getSecret(inputs['password'])
     sync = inputs['sync'] if 'sync' in inputs and inputs['sync'] in [True, False] else True
     create = inputs['create'] if 'create' in inputs and inputs['create'] else ''
-    inputs['output'] = ''
     delimeter = '__VRA_EXEC_DELIMETER__'
     
     if create:

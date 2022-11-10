@@ -379,6 +379,7 @@ resources:
         - 2
         - 0
     properties:
+      name: k8s-master
       image: ${input._image_}
       flavor: ${input.masterFlavor}
       placementPolicy: ${input._computeType_=="vmw"?"true":"false"}
@@ -414,6 +415,7 @@ resources:
         - 2
         - 1
     properties:
+      name: k8s-worker
       image: ${input._image_}
       flavor: ${input.workerFlavor}
       count: ${input.workerCluster}

@@ -41,6 +41,7 @@ resources:
         - 0
         - 0
     properties:
+      name: vm-basic
       image: ${input.image}
       flavor: ${input.flavor}
       placementPolicy: ${input._computeType_=="vmw"?"true":"false"}

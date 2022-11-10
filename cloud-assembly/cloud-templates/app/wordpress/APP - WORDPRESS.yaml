@@ -101,6 +101,7 @@ resources:
         - 0
         - 1
     properties:
+      name: wp-web
       count: ${input.webCluster}
       image: ${input._image_}
       flavor: ${input.webFlavor}
@@ -163,6 +164,7 @@ resources:
         - 0
         - 2
     properties:
+      name: wp-db
       image: ${input._image_}
       flavor: ${input.dbFlavor}
       placementPolicy: ${input._computeType_=="vmw"?"true":"false"}

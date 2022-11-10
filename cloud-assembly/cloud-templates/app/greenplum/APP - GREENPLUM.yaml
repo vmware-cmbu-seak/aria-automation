@@ -96,6 +96,7 @@ resources:
         - 0
         - 0
     properties:
+      name: gp-jump
       count: ${input._computeType_!="vmw"?1:0}
       image: ${input._image_}
       flavor: ${input._jumpFlavor_}
@@ -153,6 +154,7 @@ resources:
         - 3
         - 0
     properties:
+      name: gp-mdw
       image: ${input._image_}
       flavor: ${input.mdwFlavor}
       placementPolicy: ${input._computeType_=="vmw"?"true":"false"}
@@ -428,6 +430,7 @@ resources:
         - 1
     allocatePerInstance: true
     properties:
+      name: gp-smdw
       image: ${input._image_}
       flavor: ${input.mdwFlavor}
       placementPolicy: ${input._computeType_=="vmw"?"true":"false"}
@@ -637,6 +640,7 @@ resources:
         - 2
     allocatePerInstance: true
     properties:
+      name: gp-sdw
       image: ${input._image_}
       flavor: ${input.sdwFlavor}
       count: ${input.sdwCount}

@@ -122,7 +122,7 @@ def handler(context, inputs):
     for catalog in inputs['catalogs']:
         try:
             catalogItems.append({
-                'id': vra.get('/catalog/api/items?search=' + catalog)['content'][0]['id'],
+                'id': vra.get('/catalog/api/admin/items?search=' + catalog)['content'][0]['id'],
                 'type': 'CATALOG_ITEM_IDENTIFIER'
             })
         except Exception as e: pass

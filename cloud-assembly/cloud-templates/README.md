@@ -4,7 +4,7 @@ This samples just simple reference.</br>
 All actual environments are consisted of complexity, also have to reflect about various needs.</br>
 Please, **consult with VMware PSO team.**
 
-**All samples are already included in "com.vmk.package" orchestrator package**
+All samples are already included in <a href="https://github.com/vmware-cmbu-seak/aria-automation/raw/main/orchestrator/com.vmk.package">VMK Orchestrator Package (com.vmk.packages)</a>
 
 
 ## Template List

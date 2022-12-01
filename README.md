@@ -6,8 +6,11 @@ Aria Automation Repository
 <div style="border-style: dashed;margin: 1em;padding: 1em">
 	<h3><p align="center">Internal Links</p></h3>
 	<p align="center"><a href="./prepare-vm-template">Build vSphere VM Templates (for cloud-init and static ip management)</a></p>
-	<p align="center"><a href="https://github.com/vmware-cmbu-seak/aria-automation/raw/main/orchestrator/com.vmk.package">Download VMK Package</a></p>
-	<p align="center"><a href="./cloud-assembly/cloud-templates/templates">Sample Cloud Templates</a></p>
+	<p align="center"><a href="https://github.com/vmware-cmbu-seak/aria-automation/raw/main/orchestrator/com.vmk.package">Download VMK Orchestrator Package (com.vmk.packages)</a>
+	and
+	<a href="./prepare-vm-template">Initial Setup</a>
+	</p>
+	<p align="center"><a href="./cloud-assembly/cloud-templates">Sample Cloud Templates</a></p>
 	<p align="center"><a href="./orchestrator">Orchestrator Source Codes</a></p>
 </div>
 </br>

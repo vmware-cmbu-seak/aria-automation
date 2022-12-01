@@ -8,7 +8,7 @@ These install scripts are consider
  - Fastest boot time options (adjust bootloader)
  - cloud-like user environment (garbage throttling)
  - Install VMware Tools (recommended latest version of official VMTools lather than open-source version)
- - Install "vra-init" service (described below)
+ - Install "vra-init" service and tools such as "vra-ready" (described below)
 
 **Scripts Links**
 
@@ -19,9 +19,11 @@ Scripts can be done "just run", however recommended executing line by line. beca
 
 ## Admin Task When Day 2 Install/Update Software/Setting In Aria VM Templates
 
-**Please clean garbage files such as pre-version packages**
+**Please clean garbage files such as pre-version packages and temp files for reducing disk space**
 
 ```
+# rm -rf {{YOUR_GARBAGES}}
+
 [ RHEL / CentOS / LockyOS ]
 # yum clean all
 
@@ -34,6 +36,8 @@ Scripts can be done "just run", however recommended executing line by line. beca
 ```
 $ vra-ready
 ```
+
+"vra-ready" will remove more garbages and power off vm automatically.
 
 ## vra-init
 

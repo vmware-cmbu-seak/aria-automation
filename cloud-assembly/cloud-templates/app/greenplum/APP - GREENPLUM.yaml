@@ -23,6 +23,18 @@ inputs:
     title: image
     readOnly: true
     default: gpdb
+  _gpPkgRepo_:
+    type: string
+    title: gpPkgRepo
+    readOnly: true
+    default: https://dl.vmkloud.com/share/images/vmware/gpdb
+  _ntp_:
+    type: array
+    title: ntp
+    readOnly: true
+    default:
+      - 172.16.0.1
+      - time.kriss.re.kr
   zoneId:
     type: string
     title: Cloud
@@ -78,9 +90,6 @@ inputs:
       - 6.19.4
       - 6.20.5
       - 6.21.0
-  ntp:
-    type: string
-    title: NTP Server
   username:
     type: string
     title: Username
@@ -261,7 +270,7 @@ resources:
               includefile /etc/ntp/crypto/pw
               keys /etc/ntp/keys
               disable monitor
-              server ${input.ntp} iburst
+              server ${input._computeType_=="vmw"?input._ntp_[0]:input._ntp_[1]} iburst
           - path: /opt/gp.conf
             permissions: '0644'
             owner: root:root
@@ -282,7 +291,6 @@ resources:
               #!/bin/bash
               sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
               rm -rf /etc/security/limits.d/*
-              chown gpadmin:gpadmin /home/gpadmin/gp.conf
               # SYSCTL
               echo "kernel.shmall = $(expr $(getconf _PHYS_PAGES) / 2)" >> /etc/sysctl.conf
               echo "kernel.shmmax = $(expr $(getconf _PHYS_PAGES) / 2 \* $(getconf PAGE_SIZE))" >> /etc/sysctl.conf
@@ -324,11 +332,13 @@ resources:
               echo "/dev/$DISK /data xfs defaults 0 0" >> /etc/fstab
               mkdir -p /data/master
               chown gpadmin:gpadmin /data/master
-              yum update -y
-              yum install -y epel-release
-              yum install -y apr apr-util bash bzip2 curl krb5-devel libcurl libevent libxml2 libyaml zlib openldap openssh openssl openssl-libs perl readline rsync R sed tar zip ntp wget
+              if [ "${input._computeType_}" != "vmw" ]; then
+                yum update -y
+                yum install -y epel-release
+                yum install -y apr apr-util bash bzip2 curl krb5-devel libcurl libevent libxml2 libyaml zlib openldap openssh openssl openssl-libs perl readline rsync R sed tar zip ntp wget
+              fi
               mkdir -p /gpdb
-              wget --no-check-certificate https://download.vmkloud.com/share/images/vmware/gpdb/greenplum-db-${input.version}-rhel7-x86_64.rpm -O /gpdb/greenplum-db.rpm
+              wget --no-check-certificate ${input._gpPkgRepo_}/greenplum-db-${input.version}-rhel7-x86_64.rpm -O /gpdb/greenplum-db.rpm
               rpm --install /gpdb/greenplum-db.rpm --prefix=/gpdb
               chown -R gpadmin:gpadmin /gpdb/greenplum*
               chgrp -R gpadmin /gpdb/greenplum*
@@ -368,6 +378,7 @@ resources:
             owner: root:root
             content: |
               #!/bin/bash
+              systemctl restart sshd
               if [ ! -f /etc/gp-deploy ]; then
                 echo PREPARED > /etc/gp-deploy
                 PREPARED_TARGET=${(input.mdwStandby==true?1:0) + input.sdwCount}
@@ -539,7 +550,7 @@ resources:
               keys /etc/ntp/keys
               disable monitor
               server mdw prefer
-              server ${input.ntp}
+              server ${input._computeType_=="vmw"?input._ntp_[0]:input._ntp_[1]}
           - path: /opt/gp_prepare.sh
             permissions: '0744'
             owner: root:root
@@ -582,11 +593,13 @@ resources:
               mkdir -p /data/master
               chown gpadmin:gpadmin /data/master
               # GPDB Package
-              yum update -y
-              yum install -y epel-release
-              yum install -y apr apr-util bash bzip2 curl krb5-devel libcurl libevent libxml2 libyaml zlib openldap openssh openssl openssl-libs perl readline rsync R sed tar zip ntp wget
+              if [ "${input._computeType_}" != "vmw" ]; then
+                yum update -y
+                yum install -y epel-release
+                yum install -y apr apr-util bash bzip2 curl krb5-devel libcurl libevent libxml2 libyaml zlib openldap openssh openssl openssl-libs perl readline rsync R sed tar zip ntp wget
+              fi
               mkdir -p /gpdb
-              wget --no-check-certificate https://download.vmkloud.com/share/images/vmware/gpdb/greenplum-db-${input.version}-rhel7-x86_64.rpm -O /gpdb/greenplum-db.rpm
+              wget --no-check-certificate ${input._gpPkgRepo_}/greenplum-db-${input.version}-rhel7-x86_64.rpm -O /gpdb/greenplum-db.rpm
               rpm --install /gpdb/greenplum-db.rpm --prefix=/gpdb
               chown -R gpadmin:gpadmin /gpdb/greenplum*
               chgrp -R gpadmin /gpdb/greenplum*
@@ -615,6 +628,7 @@ resources:
             owner: root:root
             content: |
               #!/bin/bash
+              systemctl restart sshd
               if [ ! -f /etc/gp-deploy ]; then
                 echo PREPARED > /etc/gp-deploy
                 while true; do
@@ -793,11 +807,13 @@ resources:
               mkdir -p /data/mirror
               chown gpadmin:gpadmin /data/*
               # GPDB Package
-              yum update -y
-              yum install -y epel-release
-              yum install -y apr apr-util bash bzip2 curl krb5-devel libcurl libevent libxml2 libyaml zlib openldap openssh openssl openssl-libs perl readline rsync R sed tar zip ntp wget
+              if [ "${input._computeType_}" != "vmw" ]; then
+                yum update -y
+                yum install -y epel-release
+                yum install -y apr apr-util bash bzip2 curl krb5-devel libcurl libevent libxml2 libyaml zlib openldap openssh openssl openssl-libs perl readline rsync R sed tar zip ntp wget
+              fi
               mkdir -p /gpdb
-              wget --no-check-certificate https://download.vmkloud.com/share/images/vmware/gpdb/greenplum-db-${input.version}-rhel7-x86_64.rpm -O /gpdb/greenplum-db.rpm
+              wget --no-check-certificate ${input._gpPkgRepo_}/greenplum-db-${input.version}-rhel7-x86_64.rpm -O /gpdb/greenplum-db.rpm
               rpm --install /gpdb/greenplum-db.rpm --prefix=/gpdb
               chown -R gpadmin:gpadmin /gpdb/greenplum*
               chgrp -R gpadmin /gpdb/greenplum*
@@ -826,6 +842,7 @@ resources:
             owner: root:root
             content: |
               #!/bin/bash
+              systemctl restart sshd
               if [ ! -f /etc/gp-deploy ]; then
                 echo PREPARED > /etc/gp-deploy
                 while true; do

@@ -11,7 +11,6 @@ Aria Automation Repository
 	<a href="./orchestrator">Initial Setup</a>
 	</p>
 	<p align="center"><a href="./cloud-assembly/cloud-templates">Sample Cloud Templates</a></p>
-	<p align="center"><a href="./orchestrator">Orchestrator Source Codes</a></p>
 </div>
 </br>
 <div style="border-style: dashed;margin: 1em;padding: 1em">

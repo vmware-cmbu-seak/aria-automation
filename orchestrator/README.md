@@ -2,4 +2,4 @@
 
 Initial Setup
 
-[<img src="https://i.ytimg.com/vi/Hc79sDi3f0U/maxresdefault.jpg" width="50%">](https://youtu.be/tzHkcPne32I "Install \"com.vmk.package\"")
+[<img src="https://github.com/vmware-cmbu-seak/aria/blob/main/docs/images/vmware-aria-logo-3.png?raw=true" width="50%">](https://youtu.be/tzHkcPne32I "Install \"com.vmk.package\"")

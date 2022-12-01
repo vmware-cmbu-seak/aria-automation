@@ -17,7 +17,7 @@ These install scripts are consider
 
 Scripts can be done "just run", however recommended executing line by line. because all environments has exceptions.
 
-## Admin Task When Day 2 Install/Update Software/Setting In Aria VM Images
+## Admin Task When Day 2 Install/Update Software/Setting In Aria VM Templates
 
 **Please clean garbage files such as pre-version packages**
 

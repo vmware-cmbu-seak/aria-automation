@@ -1,0 +1,29 @@
+properties:
+  name:
+    type: string
+    title: Name
+    description: Unique name of deployment
+    recreateOnUpdate: true
+  inputs:
+    type: object
+    title: Inputs
+    description: Inputs parameters to deploy
+    default: {}
+  itemName:
+    type: string
+    title: Contents
+    description: Contents name to deploy
+    recreateOnUpdate: true
+  itemType:
+    type: string
+    title: Contents Type
+    description: Contents from blueprint or catalog
+    recreateOnUpdate: true
+    enum:
+      - blueprint
+      - catalog
+  projectName:
+    type: string
+    title: Project
+    description: Assigned project
+    recreateOnUpdate: true

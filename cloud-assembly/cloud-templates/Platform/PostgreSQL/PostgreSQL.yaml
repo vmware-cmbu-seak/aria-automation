@@ -1,0 +1,330 @@
+formatVersion: 1
+inputs:
+  _serviceCategory_:
+    type: string
+    title: 서비스 카테고리
+    default: Platform
+    readOnly: true
+  _serviceExpose_:
+    type: string
+    title: 서비스 노출
+    default: resource.master.address
+    readOnly: true
+  name_:
+    type: string
+    title: VM 이름
+  zoneId_:
+    type: string
+    title: 클라우드 지역
+  computeTag_:
+    type: string
+    title: 호스트 지역
+  flavor_:
+    type: string
+    title: VM 성능
+  replicaCount_:
+    type: number
+    title: 복제 노드 개수
+    default: 0
+    minimum: 0
+  extNetworkTag_:
+    type: string
+    title: 외부 네트워크
+  intNetworkTag_:
+    type: string
+    title: 내부 네트워크
+  masterIpAddress_:
+    type: string
+    title: 마스터 IP 주소
+    default: ''
+  slaveIpAddress_:
+    type: string
+    title: 슬레이브 IP 주소
+    default: ''
+  diskSize_:
+    type: number
+    title: 추가 디스크 (GB)
+    default: 1
+    minimum: 1
+  username_:
+    type: string
+    title: 사용자 계정
+  password_:
+    type: string
+    title: 사용자 암호
+    encrypted: true
+  initDBScripts_:
+    type: string
+    title: DB 초기화 스크립트트
+    default: ''
+resources:
+  fw:
+    type: Cloud.SecurityGroup
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      rules:
+        - name: psql
+          direction: inbound
+          protocol: TCP
+          ports: 5432
+          source: 0.0.0.0/0
+          access: Allow
+      securityGroupType: new
+  lb:
+    type: Cloud.LoadBalancer
+    metadata:
+      layoutPosition:
+        - 0
+        - 1
+    properties:
+      count: ${input.replicaCount_>1?1:0}
+      routes:
+        - algorithm: LEAST_CONNECTION
+          protocol: TCP
+          port: 5432
+          instanceProtocol: TCP
+          instancePort: 5432
+          healthCheckConfiguration:
+            protocol: TCP
+            port: 5432
+            intervalSeconds: 5
+            timeoutSeconds: 5
+            unhealthyThreshold: 3
+            healthyThreshold: 3
+      address: ${input.slaveIpAddress_!=""?input.slaveIpAddress_:null}
+      network: ${resource.extNet.id}
+      instances: ${resource.slave[*].id}
+      internetFacing: true
+  master:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      name: ${input.name_}-master
+      image: ubuntu20
+      flavor: ${input.flavor_}
+      constraints:
+        - tag: ${input.computeTag_}
+      networks:
+        - network: ${resource.extNet.id}
+          assignment: static
+          address: ${input.masterIpAddress_!=""?input.masterIpAddress_:null}
+          securityGroups:
+            - ${resource.fw.id}
+        - network: ${resource.intNet.id}
+          assignment: static
+      attachedDisks:
+        - source: ${resource.masterDisk.id}
+      cloudConfig: |
+        #cloud-config
+        users:
+          - name: ${input.username_}
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            lock_passwd: false
+          - name: postgres
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            lock_passwd: false
+        chpasswd:
+          list:
+            - ${input.username_}:${input.password_}
+            - postgres:${input.password_}
+          expire: false
+        ssh_pwauth: true
+        disk_setup:
+          /dev/sdb:
+            table_type: gpt
+            layout: True
+            overwrite: True
+        fs_setup:
+          - device: /dev/sdb
+            filesystem: ext4
+        mounts:
+          - [sdb, /var/lib/postgresql, "auto", "defaults", "0", "0"]
+        package_update: true
+        package_upgrade: true
+        write_files:
+          - path: /opt/user.sql
+            permissions: '0644'
+            owner: root:root
+            content: |
+              CREATE USER ${input.username_} PASSWORD '${input.password_}' SUPERUSER;
+              ALTER USER ${input.username_} CREATEROLE;
+              ALTER USER ${input.username_} CREATEDB;
+              ALTER USER ${input.username_} REPLICATION;
+              ALTER USER ${input.username_} BYPASSRLS;
+              CREATE DATABASE ${input.username_} OWNER ${input.username_};
+          - path: /opt/init.sh
+            permissions: '0744'
+            owner: root:root
+            content: |
+              #!/bin/bash
+              rm -rf /var/lib/postgresql
+              chown -R postgres:postgres /var/lib/postgresql
+              apt install -y postgresql
+              systemctl stop postgresql
+              cat <<EOF>> /etc/postgresql/12/main/postgresql.conf
+              # Aria Automation Generated
+              listen_addresses = '*'
+              EOF
+              cat <<EOF>> /etc/postgresql/12/main/pg_hba.conf
+              # Aria Automation Generated
+              host    all             all             0.0.0.0/0               md5
+              EOF
+              if [ ${input.replicaCount_} -gt 0 ]; then
+              cat <<EOF>> /etc/postgresql/12/main/postgresql.conf
+              wal_level = replica
+              wal_log_hints = on
+              EOF
+              cat <<EOF>> /etc/postgresql/12/main/pg_hba.conf
+              host    replication     postgres        0.0.0.0/0               md5
+              EOF
+              fi
+              echo "export PGPASSFILE='/home/${input.username_}/.pgpass'" >> /home/${input.username_}/.bashrc
+              echo "*:*:*:${input.username_}:${input.password_}" > /home/${input.username_}/.pgpass
+              chmod 600 /home/${input.username_}/.pgpass
+              chown ${input.username_}:${input.username_} /home/${input.username_}/.pgpass
+              systemctl start postgresql
+              sudo -i -u postgres psql -c "ALTER USER postgres PASSWORD '${input.password_}';"
+              sudo -i -u postgres psql -f /opt/user.sql
+              sudo -i -u postgres psql -f /opt/init.sql
+        runcmd:
+          - echo "${base64_encode(input.initDBScripts_)}" | base64 -d | tee /opt/init.sql
+          - /opt/init.sh
+          - rm -rf /opt/init.sh /opt/init.sql /opt/user.sql
+  slave:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 1
+        - 1
+    allocatePerInstance: true
+    properties:
+      name: ${input.name_}-slave-${count.index + 1}
+      image: ubuntu20
+      flavor: ${input.flavor_}
+      constraints:
+        - tag: ${input.computeTag_}
+      networks:
+        - network: ${resource.extNet.id}
+          assignment: static
+          address: ${input.replicaCount_==1?(input.slaveIpAddress_!=""?input.slaveIpAddress_:null):null}
+          securityGroups:
+            - ${resource.fw.id}
+        - network: ${resource.intNet.id}
+          assignment: static
+      attachedDisks: ${[{"source":resource.slaveDisk[*].id[count.index]}]}
+      cloudConfig: |
+        #cloud-config
+        users:
+          - name: ${input.username_}
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            lock_passwd: false
+          - name: postgres
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            lock_passwd: false
+        chpasswd:
+          list:
+            - ${input.username_}:${input.password_}
+            - postgres:${input.password_}
+          expire: false
+        ssh_pwauth: true
+        disk_setup:
+          /dev/sdb:
+            table_type: gpt
+            layout: True
+            overwrite: True
+        fs_setup:
+          - device: /dev/sdb
+            filesystem: ext4
+        mounts:
+          - [sdb, /var/lib/postgresql, "auto", "defaults", "0", "0"]
+        package_update: true
+        package_upgrade: true
+        write_files:
+          - path: /opt/init.sh
+            permissions: '0744'
+            owner: root:root
+            content: |
+              #!/bin/bash
+              rm -rf /var/lib/postgresql
+              chown -R postgres:postgres /var/lib/postgresql
+              apt install -y postgresql
+              systemctl stop postgresql
+              cat <<EOF>> /etc/postgresql/12/main/postgresql.conf
+              # Aria Automation Generated
+              listen_addresses = '*'
+              EOF
+              cat <<EOF>> /etc/postgresql/12/main/pg_hba.conf
+              # Aria Automation Generated
+              host    all             all             0.0.0.0/0               md5
+              EOF
+              echo "export PGPASSFILE='/home/${input.username_}/.pgpass'" >> /home/${input.username_}/.bashrc
+              echo "*:*:*:${input.username_}:${input.password_}" > /home/${input.username_}/.pgpass
+              chmod 600 /home/${input.username_}/.pgpass
+              chown ${input.username_}:${input.username_} /home/${input.username_}/.pgpass
+              echo "export PGPASSFILE='/home/postgres/.pgpass'" >> /home/postgres/.bashrc
+              echo "*:*:*:postgres:${input.password_}" > /home/postgres/.pgpass
+              chmod 600 /home/postgres/.pgpass
+              chown postgres:postgres /home/postgres/.pgpass
+              echo "export PGPASSFILE='/root/.pgpass'" >> /root/.bashrc
+              echo "*:*:*:postgres:${input.password_}" > /root/.pgpass
+              chmod 600 /root/.pgpass
+              source /root/.bashrc
+              rm -rf /var/lib/postgresql/12/main/*
+              sudo -i -u postgres pg_basebackup -h ${resource.master.networks[1].address} -U postgres -w -v -Xs -P -R -D /var/lib/postgresql/12/main/
+              chown -R postgres:postgres /var/lib/postgresql/12/main
+              systemctl start postgresql
+        runcmd:
+          - /opt/init.sh
+          - rm -rf /opt/init.sh
+      count: ${input.replicaCount_}
+  extNet:
+    type: Cloud.Network
+    metadata:
+      layoutPosition:
+        - 2
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${input.extNetworkTag_}
+  intNet:
+    type: Cloud.Network
+    metadata:
+      layoutPosition:
+        - 3
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${input.intNetworkTag_}
+  masterDisk:
+    type: Cloud.Volume
+    metadata:
+      layoutPosition:
+        - 4
+        - 0
+    properties:
+      capacityGb: ${input.diskSize_}
+  slaveDisk:
+    type: Cloud.Volume
+    metadata:
+      layoutPosition:
+        - 4
+        - 1
+    properties:
+      capacityGb: ${input.diskSize_}
+      count: ${input.replicaCount_}

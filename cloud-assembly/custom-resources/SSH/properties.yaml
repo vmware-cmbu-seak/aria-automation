@@ -1,0 +1,54 @@
+properties:
+  port:
+    type: number
+    title: Port
+    description: Port to connect host
+    default: 22
+  sync:
+    type: boolean
+    title: Sync Task
+    description: Run commands as sync
+    default: true
+  state:
+    type: string
+    title: Task State
+    readOnly: true
+    default: ''
+  create:
+    type: string
+    title: Create Commands
+    description: Run script when resource created
+    default: ''
+  update:
+    type: string
+    title: Update Commands
+    description: Run script when resource updated
+    default: ''
+  address:
+    type: string
+    title: Address
+    description: Address to connect host
+  destroy:
+    type: string
+    title: Destroy Scripts
+    description: Run script when resource destroyed
+    default: ''
+  outputs:
+    type: string
+    title: Outputs
+    readOnly: true
+    default: ''
+  password:
+    type: string
+    encrypted: true
+    title: Password
+    description: Password in host to run scripts
+  username:
+    type: string
+    title: Username
+    description: Username in host to run scripts
+  executionId:
+    type: string
+    title: Execution ID
+    readOnly: true
+    default: ''

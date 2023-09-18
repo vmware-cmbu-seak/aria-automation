@@ -4,34 +4,32 @@ This samples just simple reference.</br>
 All actual environments are consisted of complexity, also have to reflect about various needs.</br>
 Please, **consult with VMware PSO team.**
 
-All samples are already included in <a href="https://github.com/vmware-cmbu-seak/aria-automation/raw/main/orchestrator/com.vmk.package">VMK Orchestrator Package (com.vmk.packages)</a>
-
-
 ## Template List
 
-### APP (Application)
+### Computing
 
- - <a href="./app/wordpress">WORDPRESS</a> : Deploying a wordpress service on various CSP (tested: vmw, aws)
- - <a href="./app/greenplum">GREENPLUM</a> : Deploying a greenplum cluster on various CSP (tested: vmw, aws)
- - <a href="./app/sockshop">SOCKSHOP</a> : Deploying sockshop containers on kubernetes which managed by aria
+ - <a href="./Computing/Virtual-Machine">Virtual Machine</a> : Single Virtual Machine
+ - <a href="./Computing/Virtual-Machine-HA">Virtual Machine HA</a> : HA Architecture Virtual Machine
+ - <a href="./Computing/Virtual-Machine-Cluster">Virtual Machine Cluster</a> : Cluster Architecture Virtual Machine
 
-### CM (Configuration Management)
+### Networking
 
- - <a href="./cm/cloud_init">CLOUD INIT</a> : Opensource cloud-init usage sample
- - <a href="./cm/ansible">ANSIBLE</a> : Ansible usage sample
- - <a href="./cm/custom_scripts">CUSTOM SCRIPTS</a> : Custom.Scripts resource usage sample, powered by aria and vmk
+ - <a href="./Networking/Virtual-Private-Zone">Virtual Private Zone</a> : Virtual Private Zone (aka VPC)
+ - <a href="./Networking/Network-Peering">Network Peering</a> : Network Link Between X VPZ Network and Y VPZ Network
 
-### K8S (Kubernetes)
+### Platform
 
- - <a href="./k8s/oss">OSS</a> : Deploying a opensource kubernetes cluster
- - <a href="./k8s/tkc">TKC</a> : Deploying a tanzu kubernetes cluster, powered by TKGs
+ - <a href="./Platform/MariaDB">MariaDB</a> : Open Source MySQL (aka RDS/Aurora)
+ - <a href="./Platform/PostgreSQL">PostgreSQL</a> : Open Source PostgreSQL (aka RDS/Aurora)
+ - <a href="./Platform/Greenplum">Greenplum</a> : VMware Greenplum
+ - <a href="./Platform/Kubernetes">Kubernetes</a> : Open Source Kubernetes (aka EKS)
+ - <a href="./Platform/Tanzu">Tanzu</a> : VMware Tanzu Kubernetes Grid Cluster (aka TKGs)
 
-### SCALE (for Auto-Scaling with vROps)
+### Application
 
- - <a href="./scale/instanced">INSTANCED</a> : Scalable sample with instance mechanism
- - <a href="./scale/reserved">RESERVED</a> : Scalable sample with reserved mechanism
+ - <a href="./Application/Wordpress">Wordpress</a> : Wordpress
+ - <a href="./Application/Sock-Shop">Sock Shop</a> : Sample Kubernetes Manifest
 
-### VM (General IaaS Features)
+### Environment
 
- - <a href="./vm/basic">BASIC</a> : Deploying simple vm features
- - <a href="./vm/advanced">ADVANCED</a> : Deploying complex vm features
+ - <a href="./Environment/Project">Project</a> : Aria Automation Tenant (aka Project)

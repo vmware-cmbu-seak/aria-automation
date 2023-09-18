@@ -1,0 +1,297 @@
+formatVersion: 1
+inputs:
+  _serviceCategory_:
+    type: string
+    title: 서비스 카테고리
+    default: Platform
+    readOnly: true
+  _serviceExpose_:
+    type: string
+    title: 서비스 노출
+    default: resource.master.address
+    readOnly: true
+  name_:
+    type: string
+    title: VM 이름
+  zoneId_:
+    type: string
+    title: 클라우드 지역
+  computeTag_:
+    type: string
+    title: 호스트 지역
+  flavor_:
+    type: string
+    title: VM 성능
+  replicaCount_:
+    type: number
+    title: 복제 노드 개수
+    default: 0
+    minimum: 0
+  extNetworkTag_:
+    type: string
+    title: 외부 네트워크
+  intNetworkTag_:
+    type: string
+    title: 내부 네트워크
+  masterIpAddress_:
+    type: string
+    title: 마스터 IP 주소
+    default: ''
+  slaveIpAddress_:
+    type: string
+    title: 슬레이브 IP 주소
+    default: ''
+  diskSize_:
+    type: number
+    title: 추가 디스크 (GB)
+    default: 1
+    minimum: 1
+  username_:
+    type: string
+    title: 사용자 계정
+  password_:
+    type: string
+    title: 사용자 암호
+    encrypted: true
+  initDBScripts_:
+    type: string
+    title: DB 초기화 스크립트트
+    default: ''
+resources:
+  fw:
+    type: Cloud.SecurityGroup
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      rules:
+        - name: sql
+          direction: inbound
+          protocol: TCP
+          ports: 3306
+          source: 0.0.0.0/0
+          access: Allow
+      securityGroupType: new
+  lb:
+    type: Cloud.LoadBalancer
+    metadata:
+      layoutPosition:
+        - 0
+        - 1
+    properties:
+      count: ${input.replicaCount_>1?1:0}
+      routes:
+        - algorithm: LEAST_CONNECTION
+          protocol: TCP
+          port: 3306
+          instanceProtocol: TCP
+          instancePort: 3306
+          healthCheckConfiguration:
+            protocol: TCP
+            port: 3306
+            intervalSeconds: 5
+            timeoutSeconds: 5
+            unhealthyThreshold: 3
+            healthyThreshold: 3
+      address: ${input.slaveIpAddress_!=""?input.slaveIpAddress_:null}
+      network: ${resource.extNet.id}
+      instances: ${resource.slave[*].id}
+      internetFacing: true
+  master:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      name: ${input.name_}-master
+      image: ubuntu20
+      flavor: ${input.flavor_}
+      constraints:
+        - tag: ${input.computeTag_}
+      networks:
+        - network: ${resource.extNet.id}
+          assignment: static
+          address: ${input.masterIpAddress_!=""?input.masterIpAddress_:null}
+          securityGroups:
+            - ${resource.fw.id}
+        - network: ${resource.intNet.id}
+          assignment: static
+      attachedDisks:
+        - source: ${resource.masterDisk.id}
+      cloudConfig: |
+        #cloud-config
+        users:
+          - name: ${input.username_}
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            lock_passwd: false
+        chpasswd:
+          list: |
+            ${input.username_}:${input.password_}
+          expire: False
+        ssh_pwauth: true
+        disk_setup:
+          /dev/sdb:
+            table_type: gpt
+            layout: True
+            overwrite: True
+        fs_setup:
+          - device: /dev/sdb
+            filesystem: ext4
+        mounts:
+          - [sdb, /var/lib/mysql, "auto", "defaults", "0", "0"]
+        package_update: true
+        package_upgrade: true
+        write_files:
+          - path: /opt/init.sh
+            permissions: '0744'
+            owner: root:root
+            content: |
+              #!/bin/bash
+              rm -rf /var/lib/mysql
+              apt install -y mariadb-server mariadb-client mariadb-backup
+              USERNAME="${input.username_}"
+              PASSWORD="${input.password_}"
+              REPLICAS=${input.replicaCount_}
+              (echo ""; echo "y"; echo "$PASSWORD"; echo "$PASSWORD"; echo "y"; echo "y"; echo "y"; echo "y";) | mysql_secure_installation
+              sed -i "s/bind-address.*/# change by automation\nbind-address = 0.0.0.0/" /etc/mysql/mariadb.conf.d/50-server.cnf
+              sed -i "s/server-id.*/# change by automation\nserver-id = 100/" /etc/mysql/mariadb.conf.d/50-server.cnf
+              sed -i "s/log_bin.*/# change by automation\nlog_bin = \/var\/log\/mysql\/mysql-bin.log/" /etc/mysql/mariadb.conf.d/50-server.cnf
+              systemctl restart mariadb
+              echo "CREATE USER $USERNAME@'%' IDENTIFIED BY '$PASSWORD';GRANT ALL PRIVILEGES ON *.* TO $USERNAME@'%';FLUSH PRIVILEGES;" | mysql -u root --password="$PASSWORD"
+              cat /opt/init.sql | mysql -u root --password="$PASSWORD"
+              if [ $REPLICAS -gt 0 ]; then
+                echo "CREATE USER replicauser@'%' IDENTIFIED BY '$PASSWORD';GRANT REPLICATION SLAVE ON *.* TO replicauser@'%';FLUSH PRIVILEGES;" | mysql -u root --password="$PASSWORD"
+                mkdir -p /backup
+                rm -rf /etc/exports
+                apt install -y --force-yes nfs-kernel-server
+                echo "/backup *(rw,async,no_root_squash,no_subtree_check)" > /etc/exports
+                exportfs -a
+                systemctl restart nfs-kernel-server
+                mariabackup --backup --target-dir /backup/ -u root
+                while true; do echo "OK" | nc -q 0 -l 8080 2>&1>/dev/null; done &
+              fi
+        runcmd:
+          - echo "${base64_encode(input.initDBScripts_)}" | base64 -d | tee /opt/init.sql
+          - /opt/init.sh
+          - rm -rf /opt/init.sh /opt/init.sql
+  slave:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 1
+        - 1
+    allocatePerInstance: true
+    properties:
+      name: ${input.name_}-slave-${count.index + 1}
+      image: ubuntu20
+      flavor: ${input.flavor_}
+      constraints:
+        - tag: ${input.computeTag_}
+      networks:
+        - network: ${resource.extNet.id}
+          assignment: static
+          address: ${input.replicaCount_==1?(input.slaveIpAddress_!=""?input.slaveIpAddress_:null):null}
+          securityGroups:
+            - ${resource.fw.id}
+        - network: ${resource.intNet.id}
+          assignment: static
+      attachedDisks: ${[{"source":resource.slaveDisk[*].id[count.index]}]}
+      cloudConfig: |
+        #cloud-config
+        users:
+          - name: ${input.username_}
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            lock_passwd: false
+        chpasswd:
+          list: |
+            ${input.username_}:${input.password_}
+          expire: False
+        ssh_pwauth: true
+        disk_setup:
+          /dev/sdb:
+            table_type: gpt
+            layout: True
+            overwrite: True
+        fs_setup:
+          - device: /dev/sdb
+            filesystem: ext4
+        mounts:
+          - [sdb, /var/lib/mysql, "auto", "defaults", "0", "0"]
+        package_update: true
+        package_upgrade: true
+        write_files:
+          - path: /opt/init.sh
+            permissions: '0744'
+            owner: root:root
+            content: |
+              #!/bin/bash
+              rm -rf /var/lib/mysql
+              apt install -y nfs-common mariadb-server mariadb-client mariadb-backup
+              USERNAME="${input.username_}"
+              PASSWORD="${input.password_}"
+              MASTER_IP="${resource.master.networks[1].address}"
+              (echo ""; echo "y"; echo "$PASSWORD"; echo "$PASSWORD"; echo "y"; echo "y"; echo "y"; echo "y";) | mysql_secure_installation
+              sed -i "s/bind-address.*/# change by automation\nbind-address = 0.0.0.0/" /etc/mysql/mariadb.conf.d/50-server.cnf
+              sed -i "s/server-id.*/# change by automation\nserver-id = 10${count.index + 1}/" /etc/mysql/mariadb.conf.d/50-server.cnf
+              sed -i "s/log_bin.*/# change by automation\nlog_bin = \/var\/log\/mysql\/mysql-bin.log\nreport-host = slave${input.replicaCount_>1?(count.index+1):""}\nread_only = 1/" /etc/mysql/mariadb.conf.d/50-server.cnf
+              systemctl stop mariadb
+              RETRY_ERR_COUNT=10; RETRY_CON_COUNT=12; RETRY_DELAY=5
+              set +e; for((i=1;i<=$RETRY_ERR_COUNT;i+=1)); do SYNC_MSG=`curl -s -S --http0.9 --http1.0 --http1.1 --retry $RETRY_CON_COUNT --retry-delay $RETRY_DELAY --retry-connrefused $MASTER_IP:8080`; [ `echo $?` == 0 ] && break; echo "Retry $i"; done; set -e
+              mkdir -p /backup
+              echo "$MASTER_IP:/backup /backup nfs defaults 0 0" >> /etc/fstab
+              mount -a
+              rm -rf /var/lib/mysql/*
+              mariabackup --prepare --target-dir /backup/
+              mariabackup --copy-back --target-dir /backup/
+              chown -R mysql. /var/lib/mysql
+              MASTER_BIN=$(cat /backup/xtrabackup_binlog_info | awk '{print $1}')
+              MASTER_POS=$(cat /backup/xtrabackup_binlog_info | awk '{print $2}')
+              systemctl start mariadb
+              echo "CHANGE MASTER TO MASTER_HOST='$MASTER_IP',MASTER_USER='replicauser',MASTER_PASSWORD='$PASSWORD',MASTER_LOG_FILE='$MASTER_BIN',MASTER_LOG_POS=$MASTER_POS;START SLAVE;" | mysql -u root --password="$PASSWORD"
+        runcmd:
+          - /opt/init.sh
+          - rm -rf /opt/init.sh
+      count: ${input.replicaCount_}
+  extNet:
+    type: Cloud.Network
+    metadata:
+      layoutPosition:
+        - 2
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${input.extNetworkTag_}
+  intNet:
+    type: Cloud.Network
+    metadata:
+      layoutPosition:
+        - 3
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${input.intNetworkTag_}
+  masterDisk:
+    type: Cloud.Volume
+    metadata:
+      layoutPosition:
+        - 4
+        - 0
+    properties:
+      capacityGb: ${input.diskSize_}
+  slaveDisk:
+    type: Cloud.Volume
+    metadata:
+      layoutPosition:
+        - 4
+        - 1
+    properties:
+      capacityGb: ${input.diskSize_}
+      count: ${input.replicaCount_}

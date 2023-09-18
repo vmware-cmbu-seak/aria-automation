@@ -1,0 +1,278 @@
+formatVersion: 1
+inputs:
+  _serviceCategory_:
+    type: string
+    title: 서비스 카테고리
+    default: Platform
+    readOnly: true
+  _serviceExpose_:
+    type: string
+    title: 서비스 노출
+    readOnly: true
+    default: ''
+  _insecureRegistry_:
+    type: string
+    title: 미인증 레지스트리 허용범위
+    default: 0.0.0.0/0
+  _syslogServer_:
+    type: string
+    title: 시스로그 서버
+  _syslogProto_:
+    type: string
+    title: 시스로그 프로토콜
+    default: udp
+  _syslogPort_:
+    type: number
+    title: 시스로그 포트
+    default: 514
+  name_:
+    type: string
+    title: 클러스터 이름
+  clusterPlan_:
+    type: string
+    title: 클러스터 플랜
+    oneOf:
+      - title: Production
+        const: prod
+      - title: Development
+        const: dev
+  masterFlavor_:
+    type: string
+    title: 마스터 성능
+    oneOf:
+      - title: 2Core 8GRam
+        const: medium
+      - title: 4Core 16GRam
+        const: large
+  workerFlavor_:
+    type: string
+    title: 워커 성능
+    oneOf:
+      - title: 2Core 8GRam
+        const: medium
+      - title: 4Core 16GRam
+        const: large
+  workerCount:
+    type: number
+    title: 워커 개수
+    default: 1
+    minimum: 1
+  version_:
+    type: string
+    title: 쿠버네티스 버전
+    default: '1.21'
+    enum:
+      - '1.21'
+resources:
+  endpoint:
+    type: Custom.Kubernetes
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      name: ${to_lower(env.projectName)}-${to_lower(input.name_)}
+      clusterType: tanzu
+      cluster: ${resource.cluster.id}
+      clusterManifest: |
+        ---
+        kind: RoleBinding
+        apiVersion: rbac.authorization.k8s.io/v1
+        metadata:
+          name: rolebinding-cluster-user-administrator
+          namespace: default
+        roleRef:
+          kind: ClusterRole
+          name: edit
+          apiGroup: rbac.authorization.k8s.io
+        subjects:
+        - kind: User
+          name: tkgs-admin@tkgs
+          apiGroup: rbac.authorization.k8s.io
+        ---
+        kind: ClusterRoleBinding
+        apiVersion: rbac.authorization.k8s.io/v1
+        metadata:
+          name: administrator-cluster-role-binding
+        roleRef:
+          kind: ClusterRole
+          name: psp:vmware-system-privileged
+          apiGroup: rbac.authorization.k8s.io
+        subjects:
+        - kind: Group
+          name: system:authenticated
+          apiGroup: rbac.authorization.k8s.io
+        ---
+        apiVersion: apps/v1
+        kind: DaemonSet
+        metadata:
+          name: vrops-cadvisor
+          namespace: kube-system
+          labels:
+            app: vrops-cadvisor
+          annotations:
+              seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+        spec:
+          selector:
+            matchLabels:
+              app: vrops-cadvisor
+          template:
+            metadata:
+              labels:
+                app: vrops-cadvisor
+                version: v0.33.0
+            spec:
+              tolerations:
+              - key: node-role.kubernetes.io/master
+                effect: NoSchedule
+              containers:
+              - name: vrops-cadvisor
+                image: google/cadvisor:v0.33.0
+                resources:
+                  requests:
+                    memory: 250Mi
+                    cpu: 250m
+                  limits:
+                    cpu: 400m
+                volumeMounts:
+                - name: rootfs
+                  mountPath: /rootfs
+                  readOnly: true
+                - name: var-run
+                  mountPath: /var/run
+                  readOnly: true
+                - name: sys
+                  mountPath: /sys
+                  readOnly: true
+                - name: docker
+                  mountPath: /var/lib/docker
+                  readOnly: true
+                - name: disk
+                  mountPath: /dev/disk
+                  readOnly: true
+                ports:
+                  - name: http
+                    containerPort: 8080
+                    hostPort : 31194
+                    protocol: TCP
+              automountServiceAccountToken: false
+              terminationGracePeriodSeconds: 30
+              volumes:
+              - name: rootfs
+                hostPath:
+                  path: /
+              - name: var-run
+                hostPath:
+                  path: /var/run
+              - name: sys
+                hostPath:
+                  path: /sys
+              - name: docker
+                hostPath:
+                  path: /var/lib/docker
+              - name: disk
+                hostPath:
+                  path: /dev/disk
+        ---
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: fluentd
+          namespace: kube-system
+          labels:
+            k8s-app: fluentd-logging
+            version: v1
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: fluentd
+        rules:
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          - namespaces
+          verbs:
+          - get
+          - list
+          - watch
+        ---
+        kind: ClusterRoleBinding
+        apiVersion: rbac.authorization.k8s.io/v1
+        metadata:
+          name: fluentd
+        roleRef:
+          kind: ClusterRole
+          name: fluentd
+          apiGroup: rbac.authorization.k8s.io
+        subjects:
+        - kind: ServiceAccount
+          name: fluentd
+          namespace: kube-system
+        ---
+        apiVersion: apps/v1
+        kind: DaemonSet
+        metadata:
+          name: fluentd
+          namespace: kube-system
+          labels:
+            k8s-app: fluentd-logging
+            version: v1
+        spec:
+          selector:
+            matchLabels:
+              k8s-app: fluentd-logging
+          template:
+            metadata:
+              labels:
+                k8s-app: fluentd-logging
+                version: v1
+            spec:
+              serviceAccount: fluentd
+              serviceAccountName: fluentd
+              tolerations:
+              - key: node-role.kubernetes.io/master
+                effect: NoSchedule
+              containers:
+              - name: fluentd
+                image: fluent/fluentd-kubernetes-daemonset:v1-debian-syslog
+                env:
+                  - name:  SYSLOG_HOST
+                    value: "${input._syslogServer_}"
+                  - name:  SYSLOG_PORT
+                    value: "${input._syslogPort_}"
+                  - name:  SYSLOG_PROTOCOL
+                    value: "${to_lower(input._syslogProto_)}"
+                resources:
+                  limits:
+                    memory: 200Mi
+                  requests:
+                    cpu: 100m
+                    memory: 200Mi
+                volumeMounts:
+                - name: varlog
+                  mountPath: /var/log
+                - name: dockercontainerlogdirectory
+                  mountPath: /var/log/pods
+                  readOnly: true
+              terminationGracePeriodSeconds: 30
+              volumes:
+              - name: varlog
+                hostPath:
+                  path: /var/log
+              - name: dockercontainerlogdirectory
+                hostPath:
+                  path: /var/log/pods
+  cluster:
+    type: Cloud.Tanzu.Cluster
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      name: ${to_lower(env.projectName)}-${to_lower(input.name_)}
+      plan: tkc-${input.version_}-${input.masterFlavor_}-${input.workerFlavor_}-${input.clusterPlan_}-plan
+      workers: ${input.workerCount}
+      constraints:
+        - tag: tkgs:tkc

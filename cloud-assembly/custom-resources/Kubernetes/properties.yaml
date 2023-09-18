@@ -1,0 +1,32 @@
+properties:
+  name:
+    type: string
+    title: Name
+    description: Kubernetes cluster name
+  cluster:
+    type: string
+    title: Cluster ID
+    description: Cluster ID in CMX registered
+    default: ''
+  project:
+    type: string
+    title: Project Name
+    description: Allocated project name of external cluster
+    default: ''
+  kubeConfig:
+    type: string
+    title: Kubernetes Config
+    description: Kube-Config of external cluster
+    default: ''
+  clusterType:
+    type: string
+    title: Cluster Type
+    description: Registered kubernetes type
+    enum:
+      - tanzu
+      - external
+  clusterManifest:
+    type: string
+    title: Cluster Manifest
+    description: Manifest for initial cluster config
+    default: ''

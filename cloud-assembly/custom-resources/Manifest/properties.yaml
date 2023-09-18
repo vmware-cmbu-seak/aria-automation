@@ -1,0 +1,41 @@
+properties:
+  name:
+    type: string
+    title: Name
+    description: Pipeline name
+    recreateOnUpdate: true
+  manifest:
+    type: string
+    title: Manifest
+    description: Manifest text
+  kubernetes:
+    type: string
+    title: Kubernetes
+    description: Kubernetes cluster
+    recreateOnUpdate: true
+  pipeConfig:
+    type: object
+    title: Pipeline Config
+    description: Manifest pipeline config
+    properties:
+      orders:
+        type: array
+        items:
+          type: object
+          properties:
+            order:
+              type: array
+              items:
+                type: string
+        default: []
+      properties:
+        type: object
+        title: Properties
+        default: {}
+    default: {}
+  persistence:
+    type: boolean
+    title: Pipeline Persistence
+    description: Pipeline persistence option when resource deleted
+    recreateOnUpdate: true
+    default: false

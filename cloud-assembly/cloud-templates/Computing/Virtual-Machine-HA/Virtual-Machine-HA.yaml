@@ -1,0 +1,322 @@
+formatVersion: 1
+inputs:
+  _serviceCategory_:
+    type: string
+    title: 서비스 카테고리
+    default: Computing
+    readOnly: true
+  _serviceExpose_:
+    type: string
+    title: 서비스 노출
+    default: resource.master.address
+    readOnly: true
+  name_:
+    type: string
+    title: VM 이름
+  zoneId_:
+    type: string
+    title: 클라우드 지역
+  computeTag_:
+    type: string
+    title: 호스트 지역
+  flavor_:
+    type: string
+    title: VM 성능
+  extNetworkTag_:
+    type: string
+    title: 외부 네트워크
+  intNetworkTag_:
+    type: string
+    title: 내부 네트워크
+  masterIpAddress_:
+    type: string
+    title: 마스터 IP 주소
+    default: ''
+  slaveIpAddress_:
+    type: string
+    title: 슬레이브 IP 주소
+    default: ''
+  fwRules_:
+    type: array
+    title: 방화벽 정책
+    default: []
+    items:
+      type: object
+      properties:
+        name:
+          type: string
+          title: 이름
+        direction:
+          type: string
+          title: 방향
+          oneOf:
+            - title: IN
+              const: inbound
+            - title: OUT
+              const: outbound
+        protocol:
+          type: string
+          title: 프로토콜
+          enum:
+            - ANY
+            - ICMP
+            - TCP
+            - UDP
+        ports:
+          type: string
+          title: 포트
+        source:
+          type: string
+          title: 시작주소
+        destination:
+          type: string
+          title: 도착지주소
+        access:
+          type: string
+          title: 정책
+          oneOf:
+            - title: ALLOW
+              const: Allow
+            - title: DROP
+              const: Drop
+            - title: DENY
+              const: Deny
+  diskSize_:
+    type: number
+    title: 추가 디스크 (GB)
+    default: 0
+    minimum: 0
+  mountPath_:
+    type: string
+    title: 디스크 경로
+    default: /data
+  image_:
+    type: string
+    title: OS 이미지
+  packages_:
+    type: array
+    title: S/W 패키지
+    default: []
+    items:
+      type: string
+  masterBootScripts_:
+    type: string
+    title: 마스터 스크립트
+    default: ''
+  slaveBootScripts_:
+    type: string
+    title: 슬레이브 스크립트
+    default: ''
+  username_:
+    type: string
+    title: 사용자 계정
+  password_:
+    type: string
+    title: 사용자 암호
+    encrypted: true
+resources:
+  fw:
+    type: Cloud.SecurityGroup
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      rules: ${input.fwRules_}
+      securityGroupType: new
+      count: ${length(input.fwRules_)>0?1:0}
+  master:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      name: ${input.name_}-master
+      image: ${input.image_}
+      flavor: ${input.flavor_}
+      constraints:
+        - tag: ${input.computeTag_}
+      networks:
+        - network: ${resource.extNet.id}
+          assignment: static
+          address: ${input.masterIpAddress_!=""?input.masterIpAddress_:null}
+          securityGroups: ${resource.fw[*].id}
+        - network: ${resource.intNet.id}
+          assignment: static
+      attachedDisks: ${map_to_object(resource.masterDisk[*].id, "source")}
+      cloudConfig: |
+        #cloud-config
+        users:
+          - name: ${input.username_}
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            ssh_authorized_keys:
+              - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDMnJBeYdztPHaAVWRVHiq3yIZQwkNc68+OK3mFLzzwjy0WO+ivG3jhGQghK9oh6vKKyHu2h08TpUzVml1XyLY5KXdipEBOBIyOwgghuxcePKjoq7gtHN9O2cWJYaSh1lfOvJ/aDYEd8wTzLi7p0TnXkeSnlRhbKJP535OeouTlvS4lcXB+Hxd1C7dG9LHWXfvQF0OxAHYVuJrXh/0EBsUmsGKbjCMYDDJy0gQppELYNnMdOzipipUb5C5FzW6kNm+oPri8ol1RoXV57sjFkhQ8ba+JGAsqo6n5SMyNjiUy6AglMHSCOoEK/RlToXmzhzI24tJLusfgZrcpUIMzaQzB
+            lock_passwd: false
+        chpasswd:
+          list: |
+            ${input.username_}:${input.password_}
+          expire: False
+        ssh_pwauth: true
+        ${input.diskSize_>0?"disk_setup:":""}
+        ${input.diskSize_>0?"  /dev/sdb:":""}
+        ${input.diskSize_>0?"    table_type: gpt":""}
+        ${input.diskSize_>0?"    layout: True":""}
+        ${input.diskSize_>0?"    overwrite: True":""}
+        ${input.diskSize_>0?"fs_setup:":""}
+        ${input.diskSize_>0?"  - device: /dev/sdb":""}
+        ${input.diskSize_>0?"    filesystem: ext4":""}
+        ${input.diskSize_>0?"mounts:":""}
+        ${input.diskSize_>0?"  - [sdb, " + input.mountPath_ + ", \"auto\", \"defaults\", \"0\", \"0\"]":""}
+        package_update: true
+        package_upgrade: true
+        packages: ${input.packages_}
+        write_files:
+          - path: /opt/id_rsa
+            permissions: '0600'
+            owner: root:root
+            content: |
+              -----BEGIN OPENSSH PRIVATE KEY-----
+              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
+              -----END OPENSSH PRIVATE KEY-----
+          - path: /opt/prepare.sh
+            permissions: '0744'
+            owner: root:root
+            content: |
+              #!bin/bash
+              MYADDR=$(ip addr | grep "^3:" -A 3 | grep "inet " | awk '{print $2}' | sed "s/\/.*//")
+              if [ -z $MYADDR ]; then
+                MYADDR=$(ip addr | grep "^2:" -A 3 | grep "inet " | awk '{print $2}' | sed "s/\/.*//")
+              fi
+              echo "# Aria Automation Generated" > /opt/hosts
+              echo "$MYADDR master" >> /opt/hosts
+              echo "${resource.slave.networks[1].address} slave" >> /opt/hosts
+              cat /opt/hosts >> /etc/hosts
+              ssh-keygen -t rsa -b 2048 -f /home/${input.username_}/.ssh/id_rsa -N ''
+              cat /home/${input.username_}/.ssh/id_rsa.pub > /home/${input.username_}/.ssh/authorized_keys
+              chown -R ${input.username_}:${input.username_} /home/${input.username_}/.ssh
+              scp -i /opt/id_rsa /opt/hosts ${input.username_}@${resource.slave.networks[1].address}:/tmp/hosts
+              ssh -i /opt/id_rsa ${input.username_}@${resource.slave.networks[1].address} "cat /tmp/hosts | sudo tee -a /etc/hosts; sudo rm -rf /tmp/hosts"
+              scp -i /opt/id_rsa /home/${input.username_}/.ssh/* ${input.username_}@${resource.slave.networks[1].address}:/home/${input.username_}/.ssh/
+              /opt/init.sh 2>&1 | tee -a /tmp/scripts.log
+              ssh -i /home/${input.username_}/.ssh/id_rsa ${input.username_}@${resource.slave.networks[1].address} "sudo /opt/init.sh 2>&1 | sudo tee -a /tmp/scripts.log; sudo rm -rf /opt/init.sh"
+        runcmd:
+          - echo "${base64_encode(input.masterBootScripts_)}" | base64 -d | tee /opt/init.sh
+          - chmod 755 /opt/init.sh
+          - /opt/prepare.sh
+          - rm -rf /opt/prepare.sh /opt/init.sh /opt/id_rsa /opt/hosts
+  slave:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 1
+        - 1
+    properties:
+      name: ${input.name_}-slave
+      image: ${input.image_}
+      flavor: ${input.flavor_}
+      constraints:
+        - tag: ${input.computeTag_}
+      networks:
+        - network: ${resource.extNet.id}
+          assignment: static
+          address: ${input.slaveIpAddress_!=""?input.slaveIpAddress_:null}
+          securityGroups: ${resource.fw[*].id}
+        - network: ${resource.intNet.id}
+          assignment: static
+      attachedDisks: ${map_to_object(resource.slaveDisk[*].id, "source")}
+      cloudConfig: |
+        #cloud-config
+        users:
+          - name: ${input.username_}
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            ssh_authorized_keys:
+              - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDMnJBeYdztPHaAVWRVHiq3yIZQwkNc68+OK3mFLzzwjy0WO+ivG3jhGQghK9oh6vKKyHu2h08TpUzVml1XyLY5KXdipEBOBIyOwgghuxcePKjoq7gtHN9O2cWJYaSh1lfOvJ/aDYEd8wTzLi7p0TnXkeSnlRhbKJP535OeouTlvS4lcXB+Hxd1C7dG9LHWXfvQF0OxAHYVuJrXh/0EBsUmsGKbjCMYDDJy0gQppELYNnMdOzipipUb5C5FzW6kNm+oPri8ol1RoXV57sjFkhQ8ba+JGAsqo6n5SMyNjiUy6AglMHSCOoEK/RlToXmzhzI24tJLusfgZrcpUIMzaQzB
+            lock_passwd: false
+        chpasswd:
+          list: |
+            ${input.username_}:${input.password_}
+          expire: False
+        ssh_pwauth: true
+        ${input.diskSize_>0?"disk_setup:":""}
+        ${input.diskSize_>0?"  /dev/sdb:":""}
+        ${input.diskSize_>0?"    table_type: gpt":""}
+        ${input.diskSize_>0?"    layout: True":""}
+        ${input.diskSize_>0?"    overwrite: True":""}
+        ${input.diskSize_>0?"fs_setup:":""}
+        ${input.diskSize_>0?"  - device: /dev/sdb":""}
+        ${input.diskSize_>0?"    filesystem: ext4":""}
+        ${input.diskSize_>0?"mounts:":""}
+        ${input.diskSize_>0?"  - [sdb, " + input.mountPath_ + ", \"auto\", \"defaults\", \"0\", \"0\"]":""}
+        package_update: true
+        package_upgrade: true
+        packages: ${input.packages_}
+        runcmd:
+          - echo "${base64_encode(input.slaveBootScripts_)}" | base64 -d | tee /opt/init.sh
+          - chmod 755 /opt/init.sh
+  extNet:
+    type: Cloud.Network
+    metadata:
+      layoutPosition:
+        - 2
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${input.extNetworkTag_}
+  intNet:
+    type: Cloud.Network
+    metadata:
+      layoutPosition:
+        - 3
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${input.intNetworkTag_}
+  masterDisk:
+    type: Cloud.Volume
+    metadata:
+      layoutPosition:
+        - 4
+        - 0
+    properties:
+      capacityGb: ${input.diskSize_}
+      count: ${input.diskSize_>0?1:0}
+  slaveDisk:
+    type: Cloud.Volume
+    metadata:
+      layoutPosition:
+        - 4
+        - 1
+    properties:
+      capacityGb: ${input.diskSize_}
+      count: ${input.diskSize_>0?1:0}

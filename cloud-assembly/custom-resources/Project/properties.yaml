@@ -1,0 +1,87 @@
+properties:
+  name:
+    type: string
+    title: Name
+    description: Unique name of project
+  zones:
+    type: array
+    title: Zones
+    description: Specify the zones ID that can be used when users provision deployments in this project
+    items:
+      type: string
+    default: []
+  members:
+    type: array
+    title: Members
+    description: Accounts of member user
+    items:
+      type: string
+    default: []
+  viewers:
+    type: array
+    title: Viewers
+    description: Accounts of viewer user
+    items:
+      type: string
+    default: []
+  catalogs:
+    type: array
+    title: Catalogs
+    description: Permitted usable catalogs
+    items:
+      type: string
+    default: []
+  policyId:
+    type: string
+    title: Catalog Policy Id
+    description: Reference of catalog policy
+    readOnly: true
+    default: ''
+  description:
+    type: string
+    title: Description
+    description: Project descriptions
+    default: ''
+  projectType:
+    type: string
+    title: Project Type
+    description: select operation type to create(demand) or refer(existing)
+    recreateOnUpdate: true
+    enum:
+      - new
+      - existing
+  administrators:
+    type: array
+    title: Administrators
+    description: Accounts of administrator user
+    items:
+      type: string
+    default: []
+  placementPolicy:
+    type: string
+    title: Placement Policy
+    description: Specify the placement policy that will be applied when selecting a cloud zone for provisioning
+    enum:
+      - default
+      - spread
+    default: default
+  sharedResources:
+    type: boolean
+    title: Shared Resources
+    description: Deployments are shared between all users in the project
+    default: true
+  customProperties:
+    type: object
+    title: Custom Properties
+    description: Specify the custom properties that should be added to all requests in this project
+    default: {}
+  operationTimeout:
+    type: integer
+    title: Operation Timeout
+    description: Request timeout seconds
+    default: 0
+  machineNamingTemplate:
+    type: string
+    title: Machine Naming Template
+    description: Specify the naming template to be used for machines, networks, security groups and disks provisioned in this project
+    default: ''

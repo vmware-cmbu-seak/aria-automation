@@ -1,0 +1,287 @@
+formatVersion: 1
+inputs:
+  _serviceCategory_:
+    type: string
+    title: 서비스 카테고리
+    default: Computing
+    readOnly: true
+  _serviceExpose_:
+    type: string
+    title: 서비스 노출
+    readOnly: true
+    default: resource.lb.address
+  name_:
+    type: string
+    title: VM 이름
+  zoneId_:
+    type: string
+    title: 클라우드 지역
+  computeTag_:
+    type: string
+    title: 호스트 지역
+  flavor_:
+    type: string
+    title: VM 성능
+  count:
+    type: number
+    title: VM 개수
+    default: 1
+    minimum: 1
+  networkTag_:
+    type: string
+    title: 네트워크
+  lbAddress_:
+    type: string
+    title: LB 주소
+    default: ''
+  lbRules_:
+    type: array
+    title: 로드밸런서 정책
+    default: []
+    items:
+      type: object
+      title: 가상 서버
+      properties:
+        protocol:
+          type: string
+          title: Front-End 프로토콜
+          enum:
+            - TCP
+            - HTTP
+            - HTTPS
+        port:
+          type: number
+          title: Front-End 포트
+          minimum: 1
+          maximum: 65535
+        instanceProtocol:
+          type: string
+          title: Back-End 프로토콜
+          enum:
+            - TCP
+            - HTTP
+            - HTTPS
+        instancePort:
+          type: number
+          title: Back-End 포트
+          minimum: 1
+          maximum: 65535
+        algorithm:
+          type: string
+          title: 알고리즘
+          enum:
+            - ROUND_ROBIN
+            - WEIGHTED_ROUND_ROBIN
+            - LEAST_CONNECTION
+            - WEIGHTED_LEAST_CONNECTION
+            - IP_HASH
+            - URI
+            - URL
+            - HTTP_HEADER
+        healthCheckConfiguration:
+          type: object
+          title: Health-Check 정책
+          properties:
+            protocol:
+              type: string
+              title: Health-Check 프로토콜
+              enum:
+                - TCP
+                - HTTP
+                - HTTPS
+            port:
+              type: number
+              title: Health-Check 포트
+              default: 1
+              minimum: 1
+              maximum: 65535
+            urlPath:
+              type: string
+              title: Health-Check URL
+            intervalSeconds:
+              type: number
+              title: 인터벌 (초)
+              default: 5
+              minimum: 5
+            timeoutSeconds:
+              type: number
+              title: 타임아웃 (초)
+              default: 5
+              minimum: 5
+            healthyThreshold:
+              type: number
+              title: 정상 회수
+              default: 3
+              minimum: 1
+            unhealthyThreshold:
+              type: number
+              title: 비정상 회수
+              default: 3
+              minimum: 1
+  fwRules_:
+    type: array
+    title: 방화벽 정책
+    default: []
+    items:
+      type: object
+      properties:
+        name:
+          type: string
+          title: Name
+        direction:
+          type: string
+          title: Direction
+          oneOf:
+            - title: IN
+              const: inbound
+            - title: OUT
+              const: outbound
+        source:
+          type: string
+          title: Source
+        destination:
+          type: string
+          title: Destination
+        protocol:
+          type: string
+          title: Protocol
+          enum:
+            - ANY
+            - ICMP
+            - TCP
+            - UDP
+        ports:
+          type: string
+          title: Ports
+        access:
+          type: string
+          title: Access
+          oneOf:
+            - title: ALLOW
+              const: Allow
+            - title: DROP
+              const: Drop
+            - title: DENY
+              const: Deny
+  diskSize_:
+    type: number
+    title: 추가 디스크 (GB)
+    default: 0
+    minimum: 0
+  mountPath_:
+    type: string
+    title: 디스크 경로
+    default: /data
+  image_:
+    type: string
+    title: OS 이미지
+  packages_:
+    type: array
+    title: S/W 패키지
+    default: []
+    items:
+      type: string
+  bootScripts_:
+    type: string
+    title: 시작 스크립트
+    default: ''
+  username_:
+    type: string
+    title: 사용자 계정
+  password_:
+    type: string
+    title: 사용자 암호
+    encrypted: true
+resources:
+  fw:
+    type: Cloud.SecurityGroup
+    metadata:
+      layoutPosition:
+        - 0
+        - 1
+    properties:
+      rules: ${input.fwRules_}
+      securityGroupType: new
+      count: ${length(input.fwRules_)>0?1:0}
+  lb:
+    type: Cloud.LoadBalancer
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      routes: ${input.lbRules_}
+      address: ${input.lbAddress_!=""?input.lbAddress_:null}
+      network: ${resource.net.id}
+      instances: ${resource.vm[*].id}
+      internetFacing: true
+      count: ${length(input.lbRules_)>0?1:0}
+  vm:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 1
+        - 1
+    allocatePerInstance: true
+    properties:
+      name: ${input.name_}-${count.index + 1}
+      image: ${input.image_}
+      flavor: ${input.flavor_}
+      constraints:
+        - tag: ${input.computeTag_}
+      networks:
+        - network: ${resource.net.id}
+          assignment: static
+          securityGroups: ${resource.fw[*].id}
+      attachedDisks: ${input.diskSize_>0?[{"source":resource.disk[*].id[count.index]}]:null}
+      cloudConfig: |
+        #cloud-config
+        users:
+          - name: ${input.username_}
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            lock_passwd: false
+        chpasswd:
+          list: |
+            ${input.username_}:${input.password_}
+          expire: False
+        ssh_pwauth: true
+        ${input.diskSize_>0?"disk_setup:":""}
+        ${input.diskSize_>0?"  /dev/sdb:":""}
+        ${input.diskSize_>0?"    table_type: gpt":""}
+        ${input.diskSize_>0?"    layout: True":""}
+        ${input.diskSize_>0?"    overwrite: True":""}
+        ${input.diskSize_>0?"fs_setup:":""}
+        ${input.diskSize_>0?"  - device: /dev/sdb":""}
+        ${input.diskSize_>0?"    filesystem: ext4":""}
+        ${input.diskSize_>0?"mounts:":""}
+        ${input.diskSize_>0?"  - [sdb, " + input.mountPath_ + ", \"auto\", \"defaults\", \"0\", \"0\"]":""}
+        package_update: true
+        package_upgrade: true
+        packages: ${input.packages_}
+        runcmd:
+          - echo "${base64_encode(input.bootScripts_)}" | base64 -d | tee /opt/init.sh
+          - chmod 755 /opt/init.sh
+          - /opt/init.sh 2>&1 | tee -a /tmp/scripts.log
+          - rm -rf /opt/init.sh
+      count: ${input.count}
+  net:
+    type: Cloud.Network
+    metadata:
+      layoutPosition:
+        - 2
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${input.networkTag_}
+  disk:
+    type: Cloud.Volume
+    metadata:
+      layoutPosition:
+        - 3
+        - 1
+    properties:
+      capacityGb: ${input.diskSize_}
+      count: ${input.diskSize_>0?input.count:0}

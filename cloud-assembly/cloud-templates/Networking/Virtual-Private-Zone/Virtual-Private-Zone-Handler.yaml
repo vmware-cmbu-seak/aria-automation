@@ -1,0 +1,199 @@
+formatVersion: 1
+inputs:
+  projectName_:
+    type: string
+    title: 프로젝트 이름
+  vpzName_:
+    type: string
+    title: VPZ 이름
+  computes_:
+    type: array
+    title: 호스트 지역
+    items:
+      type: string
+  folder_:
+    type: string
+    title: 폴더
+  edgeCluster_:
+    type: string
+    title: 엣지 클러스터
+  tier0Router_:
+    type: string
+    title: Tier0 라우터
+  vpzProfType_:
+    type: string
+    title: VPZ 프로파일 타입
+  vpzProf_:
+    type: string
+    title: VPZ 프로파일
+  routedNetworks_:
+    type: array
+    title: 세그먼트
+    items:
+      type: object
+      title: 세그먼트
+      properties:
+        name:
+          type: string
+          title: 이름
+    default: []
+  outboundNetworks_:
+    type: array
+    title: 세그먼트
+    items:
+      type: object
+      title: 세그먼트
+      properties:
+        name:
+          type: string
+          title: 이름
+        networkCidr:
+          type: string
+          title: 네트워크 CIDR
+    default: []
+  storage_:
+    type: string
+    title: 데이터스토어
+  storageType_:
+    type: string
+    title: VM 디스크 타입
+resources:
+  project:
+    type: Custom.Project
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      name: ${input.projectName_}
+      projectType: existing
+      zones: ${[resource.vpz.id]}
+  vpz:
+    type: Custom.VirtualPrivateZone
+    metadata:
+      layoutPosition:
+        - 0
+        - 1
+    properties:
+      name: vpz-${input.projectName_}-${input.vpzName_}
+      computes: ${input.computes_}
+      folder: ${input.folder_}/${input.projectName_}/${input.vpzName_}
+      edgeCluster: ${input.edgeCluster_}
+      tier0Router: ${input.tier0Router_}
+      networks: ${[resource.net1.id] + resource.net2[*].id + resource.net3[*].id + resource.net4[*].id + resource.net5[*].id}
+      loadBalancers: ${[resource.lb.id]}
+      storage: ${input.storage_}
+      storageType: ${input.storageType_}
+  lb:
+    type: Cloud.NSX.LoadBalancer
+    metadata:
+      layoutPosition:
+        - 0
+        - 2
+    properties:
+      name: vpz-${input.projectName_}-${input.vpzName_}
+      routes:
+        - protocol: TCP
+          port: 1
+          instanceProtocol: TCP
+          instancePort: 1
+      network: ${resource.net1.id}
+      instances: []
+      internetFacing: false
+      gateway: ${resource.gw.id}
+  gw:
+    type: Cloud.NSX.Gateway
+    metadata:
+      layoutPosition:
+        - 0
+        - 3
+    properties:
+      name: vpz-${input.projectName_}-${input.vpzName_}
+      networks: ${[resource.net1.id] + resource.net2[*].id + resource.net3[*].id + resource.net4[*].id + resource.net5[*].id}
+  net1:
+    type: Cloud.NSX.Network
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      networkType: ${input.vpzProfType_=="vpzProfType:routed"?"routed":"outbound"}
+      name: ${input.vpzName_}-${input.vpzProfType_=="vpzProfType:routed"?input.routedNetworks_[0].name:input.outboundNetworks_[0].name}
+      networkCidr: ${input.vpzProfType_=="vpzProfType:outbound"?input.outboundNetworks_[0].networkCidr:null}
+      constraints:
+        - tag: ${input.vpzProf_}
+      tags:
+        - key: vpz
+          value: ${input.projectName_}-${input.vpzName_}-${input.vpzProfType_=="vpzProfType:routed"?input.routedNetworks_[0].name:input.outboundNetworks_[0].name}
+  net2:
+    type: Cloud.NSX.Network
+    dependsOn:
+      - net1
+    metadata:
+      layoutPosition:
+        - 2
+        - 0
+    properties:
+      networkType: ${input.vpzProfType_=="vpzProfType:routed"?"routed":"outbound"}
+      name: ${input.vpzName_}-${input.vpzProfType_=="vpzProfType:routed"?input.routedNetworks_[1].name:input.outboundNetworks_[1].name}
+      networkCidr: ${input.vpzProfType_=="vpzProfType:outbound"?input.outboundNetworks_[1].networkCidr:null}
+      constraints:
+        - tag: ${input.vpzProf_}
+      tags:
+        - key: vpz
+          value: ${input.projectName_}-${input.vpzName_}-${input.vpzProfType_=="vpzProfType:routed"?input.routedNetworks_[1].name:input.outboundNetworks_[1].name}
+      count: ${input.vpzProfType_=="vpzProfType:routed"?(length(input.routedNetworks_)>1?1:0):(length(input.outboundNetworks_)>1?1:0)}
+  net3:
+    type: Cloud.NSX.Network
+    dependsOn:
+      - net2
+    metadata:
+      layoutPosition:
+        - 3
+        - 0
+    properties:
+      networkType: ${input.vpzProfType_=="vpzProfType:routed"?"routed":"outbound"}
+      name: ${input.vpzName_}-${input.vpzProfType_=="vpzProfType:routed"?input.routedNetworks_[2].name:input.outboundNetworks_[2].name}
+      networkCidr: ${input.vpzProfType_=="vpzProfType:outbound"?input.outboundNetworks_[2].networkCidr:null}
+      constraints:
+        - tag: ${input.vpzProf_}
+      tags:
+        - key: vpz
+          value: ${input.projectName_}-${input.vpzName_}-${input.vpzProfType_=="vpzProfType:routed"?input.routedNetworks_[2].name:input.outboundNetworks_[2].name}
+      count: ${input.vpzProfType_=="vpzProfType:routed"?(length(input.routedNetworks_)>2?1:0):(length(input.outboundNetworks_)>2?1:0)}
+  net4:
+    type: Cloud.NSX.Network
+    dependsOn:
+      - net3
+    metadata:
+      layoutPosition:
+        - 4
+        - 0
+    properties:
+      networkType: ${input.vpzProfType_=="vpzProfType:routed"?"routed":"outbound"}
+      name: ${input.vpzName_}-${input.vpzProfType_=="vpzProfType:routed"?input.routedNetworks_[3].name:input.outboundNetworks_[3].name}
+      networkCidr: ${input.vpzProfType_=="vpzProfType:routed"?input.outboundNetworks_[3].networkCidr:null}
+      constraints:
+        - tag: ${input.vpzProf_}
+      tags:
+        - key: vpz
+          value: ${input.projectName_}-${input.vpzName_}-${input.vpzProfType_=="vpzProfType:routed"?input.routedNetworks_[3].name:input.outboundNetworks_[3].name}
+      count: ${input.vpzProfType_=="vpzProfType:routed"?(length(input.routedNetworks_)>3?1:0):(length(input.outboundNetworks_)>3?1:0)}
+  net5:
+    type: Cloud.NSX.Network
+    dependsOn:
+      - net4
+    metadata:
+      layoutPosition:
+        - 5
+        - 0
+    properties:
+      networkType: ${input.vpzProfType_=="vpzProfType:routed"?"routed":"outbound"}
+      name: ${input.vpzName_}-${input.vpzProfType_=="vpzProfType:routed"?input.routedNetworks_[4].name:input.outboundNetworks_[4].name}
+      networkCidr: ${input.vpzProfType_=="vpzProfType:routed"?input.outboundNetworks_[4].networkCidr:null}
+      constraints:
+        - tag: ${input.vpzProf_}
+      tags:
+        - key: vpz
+          value: ${input.projectName_}-${input.vpzName_}-${input.vpzProfType_=="vpzProfType:routed"?input.routedNetworks_[4].name:input.outboundNetworks_[4].name}
+      count: ${input.vpzProfType_=="vpzProfType:routed"?(length(input.routedNetworks_)>4?1:0):(length(input.outboundNetworks_)>4?1:0)}

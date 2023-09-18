@@ -1,0 +1,30 @@
+formatVersion: 1
+inputs:
+  _serviceCategory_:
+    type: string
+    title: 서비스 카테고리
+    default: Networking
+    readOnly: true
+  _serviceExpose_:
+    type: string
+    title: 서비스 노출
+    readOnly: true
+    default: ''
+  _transportZone_:
+    type: string
+    title: 트랜스포트 존
+  peeringTargets:
+    type: array
+    title: 연결 대상
+    items:
+      type: string
+resources:
+  peering:
+    type: Custom.NSX.Peer
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      transportZone: ${input._transportZone_}
+      networks: ${input.peeringTargets}

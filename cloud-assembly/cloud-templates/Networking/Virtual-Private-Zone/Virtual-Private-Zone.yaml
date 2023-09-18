@@ -1,0 +1,109 @@
+formatVersion: 1
+inputs:
+  _serviceCategory_:
+    type: string
+    title: 서비스 카테고리
+    default: Networking
+    readOnly: true
+  _serviceExpose_:
+    type: string
+    title: 서비스 노출
+    readOnly: true
+    default: ''
+  _templateProjectId_:
+    type: string
+    title: 템플릿 프로젝트 ID
+    readOnly: true
+    default: 2f5aa5ce-89af-4851-9e88-54eff7377a0b
+  _templateProjectName_:
+    type: string
+    title: 템플릿 프로젝트 이름
+  projectName_:
+    type: string
+    title: VPZ 프로젝트 이름
+  vpzName_:
+    type: string
+    title: VPZ 이름
+  zoneId_:
+    type: string
+    title: 클라우드 지역
+  computes_:
+    type: array
+    title: 호스트 지역
+    items:
+      type: string
+  folder_:
+    type: string
+    title: 폴더
+  edgeCluster_:
+    type: string
+    title: 엣지 클러스터
+  tier0Router_:
+    type: string
+    title: Tier0 라우터
+  vpzProfType_:
+    type: string
+    title: VPZ 프로파일 타입
+  vpzProf_:
+    type: string
+    title: VPZ 프로파일
+  routedNetworks_:
+    type: array
+    title: 네트워크
+    items:
+      type: object
+      title: 네트워크
+      properties:
+        name:
+          type: string
+          title: 이름
+    default: []
+  outboundNetworks_:
+    type: array
+    title: 네트워크
+    items:
+      type: object
+      title: 네트워크
+      properties:
+        name:
+          type: string
+          title: 이름
+        networkCidr:
+          type: string
+          title: 네트워크 CIDR
+    default: []
+  storage_:
+    type: string
+    title: 데이터스토어
+  storageType_:
+    type: string
+    title: VM 디스크 타입
+    enum:
+      - thin
+      - thick
+      - eagerZeroedThick
+resources:
+  vpz:
+    type: Custom.Deployment
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      name: 'VPZ Handler: ${input.projectName_}/${input.vpzName_}'
+      itemName: Virtual Private Zone Handler
+      itemType: blueprint
+      projectName: ${input._templateProjectName_}
+      inputs:
+        projectName_: ${input.projectName_}
+        vpzName_: ${input.vpzName_}
+        computes_: ${input.computes_}
+        folder_: ${input.folder_}
+        edgeCluster_: ${input.edgeCluster_}
+        tier0Router_: ${input.tier0Router_}
+        vpzProfType_: ${input.vpzProfType_}
+        vpzProf_: ${input.vpzProf_}
+        routedNetworks_: ${input.routedNetworks_}
+        outboundNetworks_: ${input.outboundNetworks_}
+        storage_: ${input.storage_}
+        storageType_: ${input.storageType_}

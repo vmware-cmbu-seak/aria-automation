@@ -1,0 +1,13 @@
+properties:
+  networks:
+    type: array
+    title: Networks
+    description: Network id list
+    items:
+      type: string
+    default: []
+  transportZone:
+    type: string
+    title: Transport Zone
+    description: NSX-T transport zone
+    recreateOnUpdate: true

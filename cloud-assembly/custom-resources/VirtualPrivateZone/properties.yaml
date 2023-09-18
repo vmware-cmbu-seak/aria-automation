@@ -1,0 +1,81 @@
+properties:
+  name:
+    type: string
+    title: Name
+    description: Name of virtual private zone
+  folder:
+    type: string
+    title: Folder
+    description: Folder name to deploy
+    default: ''
+  storage:
+    type: string
+    title: Storage
+    description: Datastore name to deploy
+  computes:
+    type: array
+    title: Computes
+    description: Compute name list of placement hosts, clusters or resource pools
+    items:
+      type: string
+  networks:
+    type: array
+    title: Networks
+    description: Network id list
+    items:
+      type: string
+  subnetSize:
+    type: number
+    title: Subnet Size
+    description: Splited size between on-demand networks
+    default: 24
+  edgeCluster:
+    type: string
+    title: Edge Cluster
+    description: Edge cluster name to use deployment
+    default: ''
+  networkCIDR:
+    type: string
+    title: Network CIDR
+    description: Provided CIDR for on-demand networks
+    default: ''
+  storageType:
+    type: string
+    title: Storage Type
+    description: Storage type with 'thin', 'thick' or 'eagerZeroedThick'
+    enum:
+      - thin
+      - thick
+      - eagerZeroedThick
+    default: thin
+  tier0Router:
+    type: string
+    title: Tier0 Router
+    description: NSX-T tier0 router for on-demand networks
+    default: ''
+  loadBalancers:
+    type: array
+    title: Load Balancer
+    description: Load balancer id list
+    items:
+      type: string
+    default: []
+  transportZone:
+    type: string
+    title: Transport Zone
+    description: NSX-T transport zone
+    default: ''
+  externalNetwork:
+    type: string
+    title: External Network
+    description: External network for on-demand networks
+    default: ''
+  placementPolicy:
+    type: string
+    title: Placement Policy
+    description: Placement policy with 'default', 'binpack' or 'spread'
+    enum:
+      - default
+      - binpack
+      - spread
+    default: default

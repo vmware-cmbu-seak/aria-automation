@@ -1,0 +1,23 @@
+properties:
+  keySize:
+    type: number
+    title: Key Size
+    description: Key size bits
+    maximum: 8192
+    minimum: 1024
+    default: 2048
+  password:
+    type: string
+    encrypted: true
+    title: Password
+    description: Password in vm to share cert
+  username:
+    type: string
+    title: Username
+    description: Username in vm to share cert
+  instances:
+    type: array
+    title: Instances
+    description: Instance array to share cert
+    items:
+      type: string

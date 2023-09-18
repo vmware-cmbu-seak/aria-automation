@@ -1,0 +1,50 @@
+properties:
+  osType:
+    type: string
+    title: OS Type
+    description: OS type to run scripts
+    enum:
+      - linux
+      - windows
+  destroy:
+    type: string
+    title: Destroy Scripts
+    description: Run script when destroyed
+    default: ''
+  install:
+    type: string
+    title: Install Scripts
+    description: Only run script when first deployed
+    default: ''
+  outputs:
+    type: string
+    title: Outputs
+    readOnly: true
+    default: ''
+  targets:
+    type: array
+    title: Targets
+    readOnly: true
+    items:
+      type: string
+    default: []
+  password:
+    type: string
+    encrypted: true
+    title: Password
+    description: Password in vm to run scripts
+  username:
+    type: string
+    title: Username
+    description: Username in vm to run scripts
+  configure:
+    type: string
+    title: Configure Scripts
+    description: Run script when post install and scripts updated
+    default: ''
+  instances:
+    type: array
+    title: Instances
+    description: Instance array to run scripts
+    items:
+      type: string

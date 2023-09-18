@@ -1,0 +1,211 @@
+formatVersion: 1
+inputs:
+  _serviceCategory_:
+    type: string
+    title: 서비스 카테고리
+    default: Application
+    readOnly: true
+  _serviceExpose_:
+    type: string
+    title: 서비스 노출
+    default: resource.lb.address
+    readOnly: true
+  name_:
+    type: string
+    title: VM 이름
+  zoneId_:
+    type: string
+    title: 클라우드 지역
+  computeTag_:
+    type: string
+    title: 호스트 지역
+  webflavor_:
+    type: string
+    title: Web VM 성능
+  webCount:
+    type: number
+    title: Web VM 개수
+    default: 1
+    minimum: 1
+  dbFlavor_:
+    type: string
+    title: DB VM 성능
+  networkTag_:
+    type: string
+    title: 네트워크
+  ipAddress_:
+    type: string
+    title: IP 주소
+    default: ''
+  version_:
+    type: string
+    title: 워드프레스 버전
+    enum:
+      - '6.0'
+      - 6.1.1
+      - '6.2'
+    default: '6.2'
+  username_:
+    type: string
+    title: 사용자 계정
+  password_:
+    type: string
+    title: 사용자 암호
+    encrypted: true
+resources:
+  lb:
+    type: Cloud.LoadBalancer
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      network: ${resource.net.id}
+      instances: ${resource.web[*].id}
+      internetFacing: true
+      address: ${input.ipAddress_!=""?input.ipAddress_:null}
+      routes:
+        - protocol: HTTP
+          port: '80'
+          instanceProtocol: HTTP
+          instancePort: '80'
+          healthCheckConfiguration:
+            protocol: TCP
+            port: '80'
+            intervalSeconds: 10
+            timeoutSeconds: 5
+            unhealthyThreshold: 3
+            healthyThreshold: 2
+  web:
+    type: Cloud.Machine
+    dependsOn:
+      - db
+    metadata:
+      layoutPosition:
+        - 0
+        - 1
+    allocatePerInstance: true
+    properties:
+      name: ${input.name_}-web-${count.index + 1}
+      image: ubuntu20
+      flavor: ${input.webflavor_}
+      constraints:
+        - tag: ${input.computeTag_}
+      networks:
+        - network: ${resource.net.id}
+          assignment: static
+          assignPublicIpAddress: true
+      cloudConfig: |
+        #cloud-config
+        users:
+          - name: ${input.username_}
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            lock_passwd: false
+        chpasswd:
+          list: |
+            ${input.username_}:${input.password_}
+          expire: False
+        ssh_pwauth: true
+        package_update: true
+        package_upgrade: true
+        packages:
+          - nfs-common
+          - apache2
+          - php
+          - php-gd
+          - php-xml
+          - php-zip
+          - php-curl
+          - php-intl
+          - php-soap
+          - php-mysql
+          - php-xmlrpc
+          - php-mbstring
+          - libapache2-mod-php
+        write_files:
+          - path: /opt/init.sh
+            permissions: '0744'
+            owner: root:root
+            content: |
+              #!/bin/bash
+              RETRY_ERR_COUNT=10; RETRY_CON_COUNT=12; RETRY_DELAY=5
+              set +e; for((i=1;i<=$RETRY_ERR_COUNT;i+=1)); do SYNC_MSG=`curl -s -S --http0.9 --http1.0 --http1.1 --retry $RETRY_CON_COUNT --retry-delay $RETRY_DELAY --retry-connrefused ${resource.db.address}:8080`; [ `echo $?` == 0 ] && break; echo "Retry $i"; done; set -e
+              rm -rf /var/www/html/*
+              echo "${resource.db.address}:/wordpress    /var/www/html    nfs    defaults    0    0" >> /etc/fstab
+              mount -a
+              sed -i -e "s/localhost/${resource.db.address}/g" /var/www/html/wp-config.php
+              service apache2 reload
+        runcmd:
+          - /opt/init.sh
+          - rm -rf /opt/init.sh
+      count: ${input.webCount}
+  db:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 0
+        - 2
+    properties:
+      name: ${input.name_}-db
+      image: ubuntu20
+      flavor: ${input.dbFlavor_}
+      constraints:
+        - tag: ${input.computeTag_}
+      networks:
+        - network: ${resource.net.id}
+          assignment: static
+          assignPublicIpAddress: true
+      cloudConfig: |
+        #cloud-config
+        users:
+          - name: ${input.username_}
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            lock_passwd: false
+        chpasswd:
+          list: |
+            ${input.username_}:${input.password_}
+          expire: False
+        ssh_pwauth: true
+        package_update: true
+        package_upgrade: true
+        packages:
+          - nfs-kernel-server
+          - mysql-server
+        write_files:
+          - path: /opt/init.sh
+            permissions: '0744'
+            owner: root:root
+            content: |
+              #!/bin/bash
+              mkdir -p /wordpress
+              cd /wordpress && wget https://wordpress.org/wordpress-${input.version_}.tar.gz && tar -xzf /wordpress/wordpress-${input.version_}.tar.gz -C /wordpress --strip-components 1
+              mv /wordpress/wp-config-sample.php /wordpress/wp-config.php
+              sed -i -e "s/database_name_here/wordpress/g" /wordpress/wp-config.php
+              sed -i -e "s/username_here/${input.username_}/g" /wordpress/wp-config.php
+              sed -i -e "s/password_here/${input.password_}/g" /wordpress/wp-config.php
+              echo "define('FS_METHOD', 'direct');" >> /wordpress/wp-config.php
+              chown -R www-data:www-data /wordpress
+              echo "/wordpress    *(rw,async,no_root_squash,no_subtree_check)" > /etc/exports
+              exportfs -a
+              systemctl restart nfs-kernel-server
+              sed -e '/bind-address/ s/^#*/#/' -i /etc/mysql/mysql.conf.d/mysqld.cnf
+              mysql -u root -e "create user '${input.username_}'@'%' identified by '${input.password_}'; create database wordpress character set utf8; grant all privileges on wordpress.* to '${input.username_}'@'%' with grant option; flush privileges;"
+              service mysql restart
+              while true; do echo "OK" | nc -q 0 -l 8080 2>&1>/dev/null; done &
+        runcmd:
+          - /opt/init.sh
+          - rm -rf /opt/init.sh
+  net:
+    type: Cloud.Network
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${input.networkTag_}

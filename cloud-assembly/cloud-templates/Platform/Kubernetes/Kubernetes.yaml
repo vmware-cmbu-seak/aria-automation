@@ -1,0 +1,443 @@
+formatVersion: 1
+inputs:
+  _serviceCategory_:
+    type: string
+    title: 서비스 카테고리
+    default: Platform
+    readOnly: true
+  _serviceExpose_:
+    type: string
+    title: 서비스 노출
+    readOnly: true
+    default: resource.master.address
+  _insecureRegistry_:
+    type: string
+    title: 미인증 레지스트리 허용범위
+    default: 0.0.0.0/0
+  _syslogServer_:
+    type: string
+    title: 시스로그 서버
+  _syslogProto_:
+    type: string
+    title: 시스로그 프로토콜
+    default: udp
+  _syslogPort_:
+    type: number
+    title: 시스로그 포트
+    default: 514
+  name_:
+    type: string
+    title: 클러스터 이름
+  zoneId_:
+    type: string
+    title: 클라우드 지역
+  computeTag_:
+    type: string
+    title: 호스트 지역
+  masterFlavor_:
+    type: string
+    title: 마스터 성능
+  workerFlavor_:
+    type: string
+    title: 워커 성능
+  workerCount:
+    type: number
+    title: 워커 개수
+    default: 1
+    minimum: 1
+  networkTag_:
+    type: string
+    title: 네트워크
+  ipAddress_:
+    type: string
+    title: API 주소
+    default: ''
+  cni_:
+    type: string
+    title: CNI 플러그인
+    default: antrea
+    oneOf:
+      - title: Flannel
+        const: flannel
+      - title: Calico
+        const: calico
+      - title: Antrea
+        const: antrea
+  version_:
+    type: string
+    title: 쿠버네티스 버전
+    default: 1.26.3-00
+    oneOf:
+      - title: 1.24.12
+        const: 1.24.12-00
+      - title: 1.25.8
+        const: 1.25.8-00
+      - title: 1.26.3
+        const: 1.26.3-00
+  username_:
+    type: string
+    title: 사용자 계정
+  password_:
+    type: string
+    title: 사용자 암호
+    encrypted: true
+resources:
+  endpoint:
+    type: Custom.Kubernetes
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      name: ${to_lower(env.projectName)}-${to_lower(input.name_)}
+      clusterType: external
+      project: ${env.projectName}
+      kubeConfig: ${resource.masterScripts.outputs}
+      clusterManifest: |
+        ---
+        apiVersion: apps/v1
+        kind: DaemonSet
+        metadata:
+          name: vrops-cadvisor
+          namespace: kube-system
+          labels:
+            app: vrops-cadvisor
+          annotations:
+              seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+        spec:
+          selector:
+            matchLabels:
+              app: vrops-cadvisor
+          template:
+            metadata:
+              labels:
+                app: vrops-cadvisor
+                version: v0.33.0
+            spec:
+              tolerations:
+              - key: node-role.kubernetes.io/master
+                effect: NoSchedule
+              containers:
+              - name: vrops-cadvisor
+                image: google/cadvisor:v0.33.0
+                resources:
+                  requests:
+                    memory: 250Mi
+                    cpu: 250m
+                  limits:
+                    cpu: 400m
+                volumeMounts:
+                - name: rootfs
+                  mountPath: /rootfs
+                  readOnly: true
+                - name: var-run
+                  mountPath: /var/run
+                  readOnly: true
+                - name: sys
+                  mountPath: /sys
+                  readOnly: true
+                - name: docker
+                  mountPath: /var/lib/docker
+                  readOnly: true
+                - name: disk
+                  mountPath: /dev/disk
+                  readOnly: true
+                ports:
+                  - name: http
+                    containerPort: 8080
+                    hostPort : 31194
+                    protocol: TCP
+              automountServiceAccountToken: false
+              terminationGracePeriodSeconds: 30
+              volumes:
+              - name: rootfs
+                hostPath:
+                  path: /
+              - name: var-run
+                hostPath:
+                  path: /var/run
+              - name: sys
+                hostPath:
+                  path: /sys
+              - name: docker
+                hostPath:
+                  path: /var/lib/docker
+              - name: disk
+                hostPath:
+                  path: /dev/disk
+        ---
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: fluentd
+          namespace: kube-system
+          labels:
+            k8s-app: fluentd-logging
+            version: v1
+        ---
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: fluentd
+        rules:
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          - namespaces
+          verbs:
+          - get
+          - list
+          - watch
+        ---
+        kind: ClusterRoleBinding
+        apiVersion: rbac.authorization.k8s.io/v1
+        metadata:
+          name: fluentd
+        roleRef:
+          kind: ClusterRole
+          name: fluentd
+          apiGroup: rbac.authorization.k8s.io
+        subjects:
+        - kind: ServiceAccount
+          name: fluentd
+          namespace: kube-system
+        ---
+        apiVersion: apps/v1
+        kind: DaemonSet
+        metadata:
+          name: fluentd
+          namespace: kube-system
+          labels:
+            k8s-app: fluentd-logging
+            version: v1
+        spec:
+          selector:
+            matchLabels:
+              k8s-app: fluentd-logging
+          template:
+            metadata:
+              labels:
+                k8s-app: fluentd-logging
+                version: v1
+            spec:
+              serviceAccount: fluentd
+              serviceAccountName: fluentd
+              tolerations:
+              - key: node-role.kubernetes.io/master
+                effect: NoSchedule
+              containers:
+              - name: fluentd
+                image: fluent/fluentd-kubernetes-daemonset:v1-debian-syslog
+                env:
+                  - name:  SYSLOG_HOST
+                    value: "${input._syslogServer_}"
+                  - name:  SYSLOG_PORT
+                    value: "${input._syslogPort_}"
+                  - name:  SYSLOG_PROTOCOL
+                    value: "${to_lower(input._syslogProto_)}"
+                resources:
+                  limits:
+                    memory: 200Mi
+                  requests:
+                    cpu: 100m
+                    memory: 200Mi
+                volumeMounts:
+                - name: varlog
+                  mountPath: /var/log
+                - name: dockercontainerlogdirectory
+                  mountPath: /var/log/pods
+                  readOnly: true
+              terminationGracePeriodSeconds: 30
+              volumes:
+              - name: varlog
+                hostPath:
+                  path: /var/log
+              - name: dockercontainerlogdirectory
+                hostPath:
+                  path: /var/log/pods
+  cert:
+    type: Custom.Cert
+    metadata:
+      layoutPosition:
+        - 0
+        - 1
+    properties:
+      instances: ${[resource.master.id] + resource.worker[*].id}
+      username: ${input.username_}
+      password: ${input.password_}
+  masterScripts:
+    type: Custom.Scripts
+    metadata:
+      layoutPosition:
+        - 1
+        - 0
+    properties:
+      instances:
+        - ${resource.master.id}
+      osType: linux
+      username: ${input.username_}
+      password: ${input.password_}
+      install: |
+        # cni plugin
+        KUBE_CNI="${input.cni_}"
+        POD_NETWORK_CIDR="10.244.0.0/16"
+        if [ "$KUBE_CNI" == "flannel" ]; then
+          CNI_SOURCE="https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml"
+        elif [ "$KUBE_CNI" == "calico" ]; then
+          CNI_SOURCE="https://docs.projectcalico.org/manifests/calico.yaml"
+        elif [ "$KUBE_CNI" == "antrea" ]; then
+          CNI_SOURCE="https://raw.githubusercontent.com/antrea-io/antrea/main/build/yamls/antrea.yml"
+        else
+          KUBE_CNI="antrea"
+          CNI_SOURCE="https://raw.githubusercontent.com/antrea-io/antrea/main/build/yamls/antrea.yml"
+        fi
+        # install Packages
+        curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+        echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+        curl https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+        echo "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
+        sudo apt update && sudo apt upgrade -y
+        sudo apt install docker-ce -y
+        sudo cp /tmp/daemon.json /etc/docker/daemon.json
+        sudo systemctl restart docker
+        sudo rm -rf /etc/containerd/config.toml
+        sudo systemctl restart containerd
+        sudo apt install -y kubelet=${input.version_} kubeadm=${input.version_} kubectl=${input.version_}
+        sudo swapoff -a
+        sudo sed -i '/swap/d' /etc/fstab
+        # init kubernetes
+        sudo -H kubeadm init --pod-network-cidr="$POD_NETWORK_CIDR" --apiserver-advertise-address="0.0.0.0" --apiserver-cert-extra-sans="${resource.master.networks[0].address}"
+        sudo mkdir -p /root/.kube /home/${input.username_}/.kube
+        sudo cp -i /etc/kubernetes/admin.conf /root/.kube/config
+        sudo cp -i /etc/kubernetes/admin.conf /home/${input.username_}/.kube/config
+        sudo chown root:root /root/.kube/config
+        sudo chown -R ${input.username_}:${input.username_} /home/${input.username_}/.kube
+        # start cni
+        sudo kubectl apply -f "$CNI_SOURCE"
+        # start monitoring
+        sudo kubectl apply -f /tmp/fluentd.yaml
+        sudo kubectl apply -f /tmp/cadvisor.yaml
+        # to output kubeconfig
+        cat /home/${input.username_}/.kube/config >> $output
+  workerScripts:
+    type: Custom.Scripts
+    dependsOn:
+      - masterScripts
+      - cert
+    metadata:
+      layoutPosition:
+        - 1
+        - 1
+    properties:
+      instances: ${resource.worker[*].id}
+      osType: linux
+      username: ${input.username_}
+      password: ${input.password_}
+      install: |
+        # install Packages
+        curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+        echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+        curl https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+        echo "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
+        sudo apt update && sudo apt upgrade -y
+        sudo apt install docker-ce -y
+        sudo cp /tmp/daemon.json /etc/docker/daemon.json
+        sudo systemctl restart docker
+        sudo rm -rf /etc/containerd/config.toml
+        sudo systemctl restart containerd
+        sudo apt install -y kubelet=${input.version_} kubeadm=${input.version_} kubectl=${input.version_}
+        sudo swapoff -a
+        sudo sed -i '/swap/d' /etc/fstab
+        # join kubernetes
+        echo "${resource.master.networks[0].address} master" | sudo tee -a /etc/hosts
+        JOIN_CMD=$(ssh master "kubeadm token create --print-join-command")
+        sudo -H $JOIN_CMD
+      destroy: |
+        ssh master kubectl drain --ignore-daemonsets --force $(hostname | tr [:upper:] [:lower:])
+        ssh master kubectl delete node --force $(hostname | tr [:upper:] [:lower:])
+  master:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 2
+        - 0
+    properties:
+      name: ${input.name_}-master
+      image: ubuntu20
+      flavor: ${input.masterFlavor_}
+      constraints:
+        - tag: ${input.computeTag_}
+      networks:
+        - network: ${resource.net.id}
+          assignment: static
+          address: ${input.ipAddress_!=""?input.ipAddress_:null}
+      cloudConfig: |
+        #cloud-config
+        users:
+          - name: ${input.username_}
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            lock_passwd: false
+        chpasswd:
+          list: |
+            ${input.username_}:${input.password_}
+          expire: False
+        ssh_pwauth: true
+        write_files:
+          - path: /tmp/daemon.json
+            permissions: '0600'
+            owner: root:root
+            content: |
+              {
+                  "insecure-registries": ["${input._insecureRegistry_}"]
+              }
+  worker:
+    type: Cloud.Machine
+    metadata:
+      layoutPosition:
+        - 2
+        - 1
+    allocatePerInstance: true
+    properties:
+      name: ${input.name_}-worker-${count.index + 1}
+      image: ubuntu20
+      flavor: ${input.workerFlavor_}
+      constraints:
+        - tag: ${input.computeTag_}
+      networks:
+        - network: ${resource.net.id}
+          assignment: static
+      cloudConfig: |
+        #cloud-config
+        users:
+          - name: ${input.username_}
+            sudo: ALL=(ALL) NOPASSWD:ALL
+            shell: /bin/bash
+            groups: [adm, sudo, wheel, users]
+            lock_passwd: false
+        chpasswd:
+          list: |
+            ${input.username_}:${input.password_}
+          expire: False
+        ssh_pwauth: true
+        write_files:
+          - path: /tmp/daemon.json
+            permissions: '0600'
+            owner: root:root
+            content: |
+              {
+                  "insecure-registries": ["${input._insecureRegistry_}"]
+              }
+      count: ${input.workerCount}
+  net:
+    type: Cloud.Network
+    metadata:
+      layoutPosition:
+        - 3
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: ${input.networkTag_}

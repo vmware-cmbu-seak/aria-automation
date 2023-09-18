@@ -1,0 +1,12 @@
+properties:
+  address:
+    type: string
+    title: Address
+    description: Network address specified
+    recreateOnUpdate: true
+    default: ''
+  network:
+    type: string
+    title: Network
+    description: Network ID for IP allocation
+    recreateOnUpdate: true
